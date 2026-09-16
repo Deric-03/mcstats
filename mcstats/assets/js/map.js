@@ -1,0 +1,246 @@
+/* MC Stats — carte (images Pl3xMap + joueurs), avec Leaflet */
+(function () {
+  'use strict';
+
+  var el = document.getElementById('map');
+  if (!el || !window.L) return;
+  var cfg = JSON.parse(el.getAttribute('data-map-config'));
+
+  var $ = function (s, r) { return (r || document).querySelector(s); };
+  var $$ = function (s, r) { return Array.prototype.slice.call((r || document).querySelectorAll(s)); };
+  var esc = function (s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  };
+
+  var worlds = cfg.worlds;
+  var byName = {};
+  worlds.forEach(function (w) { byName[w.name] = w; });
+
+  var current = null;
+  var tiles = null;
+  var spawnMarker = null;
+  var players = cfg.players || [];
+  var markers = {};
+  var showOffline = !!cfg.showOffline;
+  var filter = '';
+  var list = $('[data-map-list]');
+  var count = $('[data-map-count]');
+  var coordsBox = $('[data-map-coords]');
+
+  // Repère identique à Pl3xMap : axe Z vers le bas, 1 pixel = 1 bloc au zoom natif
+  var crs = L.extend({}, L.CRS.Simple, { transformation: new L.Transformation(1, 0, 1, 0) });
+  var map = L.map(el, { crs: crs, center: [0, 0], zoom: 0, zoomSnap: 1, zoomDelta: 1, attributionControl: true });
+  map.attributionControl.setPrefix('<a href="https://modrinth.com/plugin/pl3xmap" target="_blank" rel="noopener">Pl3xMap</a> · <a href="https://leafletjs.com" target="_blank" rel="noopener">Leaflet</a>');
+
+  function scale() { return 1 / Math.pow(2, current.maxOut); }
+  function toLatLng(x, z) { return L.latLng(z * scale(), x * scale()); }
+  function toBlock(latlng) { return [Math.floor(latlng.lng / scale()), Math.floor(latlng.lat / scale())]; }
+  function nativeZoom() { return current.maxOut; }
+
+  // Dossier de zoom Pl3xMap : 0 = 1 pixel par bloc, 1 = 2 blocs par pixel, etc.
+  var PlTiles = L.TileLayer.extend({
+    getTileUrl: function (c) {
+      var w = this.options.world;
+      var folder = Math.max(0, w.maxOut - c.z);
+      return cfg.tilesUrl + '/' + encodeURIComponent(w.name) + '/' + folder + '/' + encodeURIComponent(w.renderer) +
+        '/' + c.x + '_' + c.y + '.' + w.format;
+    }
+  });
+
+  // view : {x, z, zoom} pour une vue précise, sinon le point d'apparition du monde.
+  // La vue est posée avant d'ajouter les images pour ne charger que celles qui seront affichées.
+  function setWorld(name, view) {
+    var w = byName[name] || worlds[0];
+    if (current === w) {
+      if (view) map.setView(toLatLng(view.x, view.z), view.zoom);
+      return;
+    }
+    current = w;
+    var v = view || { x: w.spawn.x, z: w.spawn.z, zoom: Math.max(0, w.maxOut - w.zoom) };
+    if (tiles) map.removeLayer(tiles);
+    if (spawnMarker) map.removeLayer(spawnMarker);
+    map.setMinZoom(0);
+    map.setMaxZoom(w.maxOut + w.maxIn);
+    map.setView(toLatLng(v.x, v.z), v.zoom, { animate: false });
+    tiles = new PlTiles('', {
+      world: w,
+      tileSize: 512,
+      noWrap: true,
+      minNativeZoom: 0,
+      maxNativeZoom: w.maxOut,
+      minZoom: 0,
+      maxZoom: w.maxOut + w.maxIn,
+      className: 'map-tiles',
+      attribution: ''
+    }).addTo(map);
+    el.setAttribute('data-dimension', w.type);
+    if (cfg.spawnIcon) {
+      spawnMarker = L.marker(toLatLng(w.spawn.x + 0.5, w.spawn.z + 0.5), {
+        icon: L.divIcon({ className: 'map-spawn', html: '<span style="background-image:url(\'' + esc(cfg.spawnIcon) + '\')"></span>', iconSize: [20, 20], iconAnchor: [10, 10] }),
+        title: "Point d'apparition", keyboard: false, zIndexOffset: -100
+      }).addTo(map);
+    }
+    $$('[data-map-world]').forEach(function (b) {
+      var on = b.getAttribute('data-map-world') === w.name;
+      b.classList.toggle('is-active', on);
+      b.setAttribute('aria-selected', on ? 'true' : 'false');
+    });
+    Object.keys(markers).forEach(function (k) { map.removeLayer(markers[k].m); });
+    markers = {};
+    refresh();
+  }
+
+  function visible(p) {
+    return p.online || showOffline;
+  }
+
+  function popupHtml(p) {
+    return '<div class="map-pop"><img src="' + esc(p.head) + '" alt="" width="40" height="40">' +
+      '<div><strong>' + esc(p.name) + '</strong>' +
+      '<span class="' + (p.online ? 'text-online' : 'muted') + '">' + esc(p.seen) + '</span>' +
+      (cfg.showCoords && !p.hideCoords ? '<span class="muted map-pop__xyz">X ' + p.x + ' · Z ' + p.z + '</span>' : '') +
+      '<a href="' + esc(p.url) + '">Voir le profil →</a></div></div>';
+  }
+
+  function icon(p) {
+    return L.divIcon({
+      className: 'map-player' + (p.online ? ' is-online' : ''),
+      html: '<img src="' + esc(p.head) + '" alt=""><span class="map-player__name">' + esc(p.name) + '</span>',
+      iconSize: [28, 28],
+      iconAnchor: [14, 14],
+      popupAnchor: [0, -16]
+    });
+  }
+
+  function renderMarkers() {
+    var keep = {};
+    players.forEach(function (p) {
+      if (p.world !== current.name || !visible(p)) return;
+      keep[p.uuid] = true;
+      var ll = toLatLng(p.x + 0.5, p.z + 0.5);
+      var entry = markers[p.uuid];
+      if (!entry) {
+        var m = L.marker(ll, { icon: icon(p), title: p.name, riseOnHover: true, zIndexOffset: p.online ? 1000 : 0 });
+        m.bindPopup(popupHtml(p), { className: 'map-popup', minWidth: 190, maxWidth: 280 });
+        m.addTo(map);
+        markers[p.uuid] = { m: m, online: p.online };
+      } else {
+        entry.m.setLatLng(ll);
+        if (entry.online !== p.online) {
+          entry.m.setIcon(icon(p));
+          entry.m.setZIndexOffset(p.online ? 1000 : 0);
+          entry.online = p.online;
+        }
+        entry.m.setPopupContent(popupHtml(p));
+      }
+    });
+    Object.keys(markers).forEach(function (k) {
+      if (!keep[k]) {
+        map.removeLayer(markers[k].m);
+        delete markers[k];
+      }
+    });
+  }
+
+  function renderList() {
+    var q = filter.toLowerCase();
+    var items = players.filter(function (p) {
+      return visible(p) && (!q || p.name.toLowerCase().indexOf(q) !== -1);
+    });
+    var online = players.filter(function (p) { return p.online; }).length;
+    if (count) count.textContent = online + ' en ligne';
+    list.innerHTML = items.length
+      ? items.map(function (p) {
+          var w = byName[p.world];
+          return '<li><button type="button" class="map-item' + (p.online ? ' is-online' : '') + '" data-uuid="' + esc(p.uuid) + '">' +
+            '<img src="' + esc(p.head) + '" alt="" width="32" height="32" loading="lazy">' +
+            '<span class="map-item__text"><strong>' + esc(p.name) + '</strong>' +
+            '<span class="' + (p.online ? 'text-online' : 'muted') + '">' + esc(p.seen) + (w ? ' · ' + esc(w.label) : '') + '</span></span></button></li>';
+        }).join('')
+      : '<li class="muted empty-note">' + (q ? 'Aucun joueur ne correspond.' : 'Aucun joueur à afficher.') + '</li>';
+  }
+
+  function refresh() {
+    renderMarkers();
+    renderList();
+  }
+
+  function findPlayer(q) {
+    q = String(q || '').toLowerCase();
+    if (!q) return null;
+    var exact = null, partial = null;
+    players.forEach(function (p) {
+      if (p.uuid === q || p.name.toLowerCase() === q) exact = exact || p;
+      else if (p.name.toLowerCase().indexOf(q) !== -1) partial = partial || p;
+    });
+    return exact || partial;
+  }
+
+  function focusPlayer(p) {
+    if (!p || !visible(p)) return;
+    var w = byName[p.world];
+    if (!w) return;
+    var zoom = current === w ? Math.max(map.getZoom(), w.maxOut) : w.maxOut;
+    setWorld(p.world, { x: p.x + 0.5, z: p.z + 0.5, zoom: zoom });
+    var entry = markers[p.uuid];
+    if (entry) entry.m.openPopup();
+    if (window.matchMedia('(max-width: 820px)').matches) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  // Panneau : dimensions, recherche, liste, joueurs hors ligne
+  $$('[data-map-world]').forEach(function (b) {
+    b.addEventListener('click', function () { setWorld(b.getAttribute('data-map-world')); });
+  });
+  var search = $('[data-map-search]');
+  if (search) {
+    search.addEventListener('input', function () { filter = search.value.trim(); renderList(); });
+    search.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') { e.preventDefault(); focusPlayer(findPlayer(search.value.trim())); }
+    });
+  }
+  var offline = $('[data-map-offline]');
+  if (offline) {
+    offline.addEventListener('change', function () { showOffline = offline.checked; refresh(); });
+  }
+  list.addEventListener('click', function (e) {
+    var b = e.target.closest ? e.target.closest('[data-uuid]') : null;
+    if (!b) return;
+    var uuid = b.getAttribute('data-uuid');
+    focusPlayer(players.filter(function (p) { return p.uuid === uuid; })[0]);
+  });
+
+  // Coordonnées sous le curseur
+  map.on('mousemove', function (e) {
+    var b = toBlock(e.latlng);
+    coordsBox.textContent = 'X ' + b[0] + ' · Z ' + b[1];
+  });
+  map.on('mouseout', function () { coordsBox.textContent = 'X – · Z –'; });
+
+  // Rafraîchissement des positions
+  function poll() {
+    fetch(cfg.api, { cache: 'no-store' })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (d) {
+        if (d && Array.isArray(d.players)) {
+          players = d.players;
+          refresh();
+        }
+      })
+      .catch(function () {});
+  }
+  setInterval(poll, cfg.refresh || 5000);
+
+  // Vue de départ : joueur demandé (?p=), coordonnées (?x=&z=&w=) ou point d'apparition
+  var f = cfg.focus || {};
+  var target = findPlayer(f.p);
+  if (target && byName[target.world]) {
+    focusPlayer(target);
+  } else if (f.x !== null && f.z !== null && f.x !== undefined) {
+    var fw = worlds.filter(function (w) { return w.name === f.w || w.type === f.w; })[0] || worlds[0];
+    setWorld(fw.name, { x: f.x, z: f.z, zoom: fw.maxOut });
+  } else {
+    setWorld(worlds[0].name);
+  }
+})();
