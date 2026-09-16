@@ -16,6 +16,21 @@ Les fichiers du serveur (`stats/`, `advancements/`, `data/`) sont lus **chaque m
 MariaDB : les visiteurs ne touchent jamais aux fichiers du serveur. Seuls les joueurs dont les fichiers ont
 changé sont relus.
 
+### Versions de Minecraft compatibles
+
+Serveurs Java vanilla, Spigot et Paper **1.16 et plus récents**. Les anciens formats de fichiers
+(dossier `playerdata`, objets d'avant 1.20.5, effets d'avant 1.20.2, modèles d'avant 1.21.4) sont
+reconnus automatiquement. Testé avec les clients 1.16.5, 1.18.2, 1.20.1, 1.21.1, 26.2 et 26.3.
+
+| Fonction | Versions |
+|----------|----------|
+| Statistiques, classements, succès, inventaires | 1.16 et plus |
+| Statut du serveur | 1.7 et plus |
+| Carte | 1.19.4 et plus (versions disponibles de Pl3xMap) |
+
+Avec Spigot ou Paper, les pseudos sont lus dans les fichiers joueurs. Avec un serveur vanilla, ils
+viennent de `usercache.json` ou de l'API Mojang.
+
 ---
 
 ## 1. Prérequis (Ubuntu)
@@ -31,24 +46,31 @@ sudo apt install apache2 mariadb-server php libapache2-mod-php php-mysql php-cur
 - Le serveur (NAS) doit avoir accès à Internet pour la première installation des ressources
   (traductions, icônes) et pour les têtes/skins des joueurs (service `mc-heads.net`).
 
-## 2. Copier le site
+## 2. Récupérer le site
+
+Le site est récupéré avec git, sous le compte qui fait tourner le serveur Minecraft (voir l'étape 5,
+ci-dessous `minecraft`, à remplacer par le vôtre). Apache n'a besoin que de lire le code.
 
 ```bash
-sudo cp -r mcstats /var/www/html/mcstats
+sudo install -d -o minecraft -g www-data -m 2775 /var/www/html/mcstats
+sudo -u minecraft git clone https://git.nascedric.fr/Cedric/mcstats.git /var/www/html/mcstats
 cd /var/www/html/mcstats
-sudo cp config.sample.php config.php
+sudo install -d -o minecraft -g www-data -m 2775 data map
+sudo -u minecraft cp config.sample.php config.php
+sudo chmod 640 config.php
 ```
 
-Le cache (`data/`), les icônes (`assets/mc/`) et `config.php` sont partagés entre Apache et le compte
-qui lance la synchronisation, c'est-à-dire le compte du serveur Minecraft (voir l'étape 5). Remplacez
-`minecraft` par ce compte :
+Le dépôt contient le code et les ressources Minecraft (traductions, succès, icônes). Restent hors de git :
+`config.php` (mot de passe de la base), la carte (`map/`, écrite par Pl3xMap) et les fichiers de travail
+de la synchronisation (`data/status.json`, `data/sync.lock`). Une mise à jour ne les touche jamais.
+
+### Mettre à jour le site
 
 ```bash
-sudo chown -R minecraft:www-data /var/www/html/mcstats/data /var/www/html/mcstats/assets/mc /var/www/html/mcstats/config.php
-sudo chmod 640 /var/www/html/mcstats/config.php
-sudo find /var/www/html/mcstats/data /var/www/html/mcstats/assets/mc -type d -exec chmod 2775 {} +
-sudo find /var/www/html/mcstats/data /var/www/html/mcstats/assets/mc -type f -exec chmod 664 {} +
+cd /var/www/html/mcstats && sudo -u minecraft git pull --ff-only
 ```
+
+Si `apache/mcstats.conf` a changé, recopiez-le puis rechargez Apache (étape 8).
 
 ## 3. Base de données MariaDB
 
@@ -109,15 +131,17 @@ Si un `.dat` est tout de même illisible, le site garde les derniers inventaires
 ## 6. Première installation des ressources et synchronisation
 
 ```bash
-sudo -u minecraft sh -c 'umask 002; php /var/www/html/mcstats/cron/sync.php --assets'
+sudo -u minecraft sh -c 'umask 002; php /var/www/html/mcstats/cron/sync.php'
 ```
 
-Cette commande télécharge depuis les serveurs de Mojang les traductions françaises, la liste des succès
-et les icônes (client Minecraft d'environ 40 Mo, supprimé après extraction), puis synchronise les joueurs.
+Le dépôt contient déjà les ressources de la version 26.3 (traductions, succès, icônes). Pour que les succès
+affichés correspondent exactement à une autre version de Minecraft, renseignez `mc_version` dans
+`config.php` puis lancez la même commande avec `--assets`. Elle télécharge depuis les serveurs de Mojang
+les traductions françaises, la liste des succès et les icônes (client Minecraft d'environ 40 Mo, supprimé
+après extraction).
 
-Le dossier fourni contient déjà les ressources de la version 26.3. Relancez `--assets` après chaque mise à
-jour de Minecraft pour récupérer les nouveaux objets. Pour cibler une version précise, renseignez
-`mc_version` dans `config.php`.
+Les icônes ne sont jamais supprimées : le dossier `assets/mc/` cumule celles de toutes les versions
+installées. Pour une même version, les fichiers produits sont toujours identiques.
 
 ## 7. Synchronisation automatique chaque minute (cron)
 

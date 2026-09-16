@@ -2,7 +2,6 @@
 // Fichier généré automatiquement
 return array (
   'version' => '26.3',
-  'installed_at' => 1789493087,
   'icons' => 
   array (
     'abandoned_camp_map' => 1,

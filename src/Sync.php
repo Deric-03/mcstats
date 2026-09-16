@@ -7,6 +7,16 @@ final class Sync
 {
     const UUID_RE = '/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/';
 
+    /** Identifiants numériques des effets (fichiers joueurs d'avant 1.20.2). */
+    const EFFECT_IDS = [
+        1 => 'speed', 2 => 'slowness', 3 => 'haste', 4 => 'mining_fatigue', 5 => 'strength', 6 => 'instant_health',
+        7 => 'instant_damage', 8 => 'jump_boost', 9 => 'nausea', 10 => 'regeneration', 11 => 'resistance',
+        12 => 'fire_resistance', 13 => 'water_breathing', 14 => 'invisibility', 15 => 'blindness', 16 => 'night_vision',
+        17 => 'hunger', 18 => 'weakness', 19 => 'poison', 20 => 'wither', 21 => 'health_boost', 22 => 'absorption',
+        23 => 'saturation', 24 => 'glowing', 25 => 'levitation', 26 => 'luck', 27 => 'unluck', 28 => 'slow_falling',
+        29 => 'conduit_power', 30 => 'dolphins_grace', 31 => 'bad_omen', 32 => 'hero_of_the_village', 33 => 'darkness',
+    ];
+
     /** Appelé par les pages web : lance la synchro si le cron ne l'a pas fait récemment. */
     public static function maybeRun(): void
     {
@@ -395,7 +405,7 @@ final class Sync
         $paper = $d['Paper'] ?? [];
 
         $maxHealth = 20.0;
-        foreach ((array) ($d['attributes'] ?? []) as $attr) {
+        foreach ((array) ($d['attributes'] ?? ($d['Attributes'] ?? [])) as $attr) {
             $aid = $attr['id'] ?? ($attr['Name'] ?? '');
             if (in_array($aid, ['minecraft:max_health', 'minecraft:generic.max_health', 'generic.maxHealth'], true)) {
                 $maxHealth = (float) ($attr['base'] ?? ($attr['Base'] ?? 20));
@@ -446,6 +456,13 @@ final class Sync
                 'amp' => (int) ($e['amplifier'] ?? 0),
                 'dur' => (int) ($e['duration'] ?? 0),
             ];
+        }
+        // Avant 1.20.2 : identifiants numériques
+        foreach ((array) ($d['ActiveEffects'] ?? []) as $e) {
+            $id = self::EFFECT_IDS[(int) ($e['Id'] ?? 0)] ?? null;
+            if ($id) {
+                $p['effects'][] = ['id' => $id, 'amp' => (int) ($e['Amplifier'] ?? 0), 'dur' => (int) ($e['Duration'] ?? 0)];
+            }
         }
 
         foreach ((array) ($d['Inventory'] ?? []) as $it) {
@@ -510,7 +527,34 @@ final class Sync
                 $o['potion'] = Mc::strip($pid);
             }
         }
+        // Avant 1.20.5 : données de l'objet dans "tag"
+        $tag = is_array($it['tag'] ?? null) ? $it['tag'] : [];
+        if (isset($tag['display']['Name'])) {
+            $o['name'] = self::text($tag['display']['Name']);
+        }
+        foreach (['Enchantments' => 'ench', 'StoredEnchantments' => 'stored'] as $k => $dst) {
+            foreach ((array) ($tag[$k] ?? []) as $e) {
+                if (isset($e['id']) && is_string($e['id'])) {
+                    $o[$dst][Mc::strip($e['id'])] = (int) ($e['lvl'] ?? 1);
+                }
+            }
+        }
+        if (!empty($tag['Damage'])) {
+            $o['damage'] = (int) $tag['Damage'];
+        }
+        if (isset($tag['Trim']['material'])) {
+            $o['trim'] = [Mc::strip((string) $tag['Trim']['material']), Mc::strip((string) ($tag['Trim']['pattern'] ?? ''))];
+        }
+        if (isset($tag['Potion']) && is_string($tag['Potion'])) {
+            $o['potion'] = Mc::strip($tag['Potion']);
+        }
         if ($depth < 2) {
+            // shulkers (BlockEntityTag.Items) et sacs (Items) d'avant 1.20.5
+            foreach ((array) ($tag['BlockEntityTag']['Items'] ?? ($tag['Items'] ?? [])) as $sub) {
+                if (is_array($sub)) {
+                    $o['contents'][] = self::simplifyItem($sub, $depth + 1);
+                }
+            }
             foreach ((array) ($c['minecraft:container'] ?? []) as $entry) {
                 if (isset($entry['item']) && is_array($entry['item'])) {
                     $sub = self::simplifyItem($entry['item'], $depth + 1);

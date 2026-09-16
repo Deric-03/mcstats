@@ -1,1 +1,11 @@
 Statistique minecraft.code-workspace
+
+# Mot de passe de la base : reste uniquement sur le serveur
+config.php
+
+# Fichiers réécrits en permanence sur le serveur
+data/status.json
+data/sync.lock
+data/*.sqlite*
+data/client.jar.part
+map/

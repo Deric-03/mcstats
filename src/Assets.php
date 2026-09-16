@@ -42,7 +42,7 @@ final class Assets
         $log('Traductions françaises : ' . count($lang) . ' textes');
 
         // 2. Client (succès + icônes)
-        $assets = ['version' => $want, 'installed_at' => time(), 'icons' => [], 'advancements' => []];
+        $assets = ['version' => $want, 'icons' => [], 'advancements' => []];
         if (!class_exists('ZipArchive')) {
             $log("Extension PHP \"zip\" absente : icônes et liste des succès non installées (sudo apt install php-zip).");
             self::writePhp(App::dataDir() . '/assets.php', $assets);
@@ -75,7 +75,7 @@ final class Assets
             }
             $assets['advancements'] = self::extractAdvancements($zip, $names);
             $log('Succès : ' . count($assets['advancements']));
-            $assets['icons'] = self::extractIcons($zip, $names, APP_ROOT . '/assets/mc');
+            $assets['icons'] = self::extractIcons($zip, $names, APP_ROOT . '/assets/mc', $lang);
             $log('Icônes : ' . count($assets['icons']));
         } finally {
             $zip->close();
@@ -144,26 +144,41 @@ final class Assets
         return $ordered;
     }
 
-    /** Extrait une icône par objet / bloc et renvoie la liste des identifiants disponibles. */
-    private static function extractIcons(ZipArchive $zip, array $names, string $dest): array
+    /**
+     * Extrait une icône par objet / bloc.
+     * Les icônes déjà présentes (autre version de Minecraft) sont conservées : le dossier cumule toutes
+     * les versions installées, et la liste renvoyée correspond à tous les fichiers présents.
+     */
+    private static function extractIcons(ZipArchive $zip, array $names, string $dest, array $lang = []): array
     {
         if (!is_dir($dest) && !@mkdir($dest, 0775, true)) {
             throw new RuntimeException("Impossible de créer $dest");
         }
+        // id => [définition d'objet ou blockstate (index zip), ou référence de modèle directe]
         $ids = [];
         foreach ($names as $name => $i) {
             if (preg_match('#^assets/minecraft/items/([a-z0-9_]+)\.json$#', $name, $m)) {
-                $ids[$m[1]] = $i;
+                $ids[$m[1]] = ['def', $i];
+            }
+        }
+        if (!$ids) {
+            // Avant 1.21.4 : pas de définitions d'objets, les modèles sont dans models/item/.
+            // Ce dossier contient aussi des modèles techniques (clock_00, bow_pulling_0…) : on ne garde
+            // que les identifiants qui ont une traduction, c'est-à-dire de vrais objets ou blocs.
+            foreach ($names as $name => $i) {
+                if (preg_match('#^assets/minecraft/models/item/([a-z0-9_]+)\.json$#', $name, $m)
+                    && (!$lang || isset($lang['item.minecraft.' . $m[1]]) || isset($lang['block.minecraft.' . $m[1]]))) {
+                    $ids[$m[1]] = ['model', 'minecraft:item/' . $m[1]];
+                }
             }
         }
         foreach ($names as $name => $i) {
             if (preg_match('#^assets/minecraft/blockstates/([a-z0-9_]+)\.json$#', $name, $m) && !isset($ids[$m[1]])) {
-                $ids[$m[1]] = $i;
+                $ids[$m[1]] = ['def', $i];
             }
         }
-        $icons = [];
-        foreach ($ids as $id => $i) {
-            $model = self::findModel(json_decode((string) $zip->getFromIndex($i), true));
+        foreach ($ids as $id => [$kind, $ref]) {
+            $model = $kind === 'model' ? $ref : self::findModel(json_decode((string) $zip->getFromIndex($ref), true));
             $tex = $model ? self::modelTexture($zip, $names, $model) : null;
             // Têtes et crânes : rendu 3D spécial, la texture de repli (sable des âmes) serait trompeuse
             if ($tex === 'block/soul_sand' && preg_match('/_(head|skull)$/', $id)) {
@@ -172,16 +187,13 @@ final class Assets
             $path = $tex ? 'assets/minecraft/textures/' . $tex . '.png' : null;
             if ($path && isset($names[$path])) {
                 file_put_contents("$dest/$id.png", $zip->getFromIndex($names[$path]));
-                $icons[$id] = 1;
             }
         }
-        // Supprime les icônes d'une installation précédente qui n'existent plus
+        $icons = [];
         foreach (glob($dest . '/*.png') ?: [] as $f) {
-            if (!isset($icons[basename($f, '.png')])) {
-                @unlink($f);
-            }
+            $icons[basename($f, '.png')] = 1;
         }
-        ksort($icons);
+        ksort($icons, SORT_STRING);
         return $icons;
     }
 
