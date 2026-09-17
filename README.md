@@ -11,6 +11,8 @@ Minecraft Java, façon « tracker » :
   détails combat / minage / déplacements, les 126 succès avec leur date d'obtention,
   inventaire et coffre de l'Ender (avec enchantements et contenu des shulkers), vie, faim, XP, position.
 - **Recherche** de joueur avec autocomplétion (pseudo ou UUID).
+- **Comptes joueurs** (optionnels) : demandes de whitelist, espace admin, et sur son propre profil le badge
+  « Vous », le contenu du sac à dos et la liste des homes (plugins, voir plus bas).
 
 Les fichiers du serveur (`stats/`, `advancements/`, `data/`) sont lus **chaque minute** et stockés dans
 MariaDB : les visiteurs ne touchent jamais aux fichiers du serveur. Seuls les joueurs dont les fichiers ont
@@ -30,6 +32,20 @@ reconnus automatiquement. Testé avec les clients 1.16.5, 1.18.2, 1.20.1, 1.21.1
 
 Avec Spigot ou Paper, les pseudos sont lus dans les fichiers joueurs. Avec un serveur vanilla, ils
 viennent de `usercache.json` ou de l'API Mojang.
+
+### Plugins compatibles
+
+Aucun plugin n'est nécessaire : ceux-ci ajoutent des fonctions au site s'ils sont installés.
+
+| Plugin | Ce qu'il apporte au site | Réglage |
+|--------|--------------------------|---------|
+| [Pl3xMap](https://modrinth.com/plugin/pl3xmap) | Page « Carte » : monde vu du dessus, positions des joueurs en direct | section `map` (étape 11) |
+| [Geyser](https://geysermc.org) + [Floodgate](https://geysermc.org/wiki/floodgate/) | Demandes de whitelist des joueurs Bedrock (commande `fwhitelist`) | section `accounts` (étape 12) |
+| [Minepacks](https://www.spigotmc.org/resources/minepacks.19286/) | Contenu du sac à dos sur le profil. Stockage SQLite uniquement (`backpack.db`, réglage par défaut du plugin) ; testé avec Minepacks 2.5.9 | `plugins.minepacks_db` (étape 13) |
+| [UltimateHomes](https://www.spigotmc.org/resources/64210/) (`playerdata/<uuid>.yml`) ou [EssentialsX](https://essentialsx.net) (`userdata/<uuid>.yml`) | Liste des homes sur le profil, avec un lien vers la carte | `plugins.homes_path` (étape 13) |
+
+Le sac à dos et les homes demandent les comptes (étape 12) : ils ne sont visibles que par le joueur
+lui-même et par les admins.
 
 ---
 
@@ -103,6 +119,7 @@ Les réglages essentiels :
 | `hidden_players` | Pseudos ou UUID à masquer du site (ex. comptes admin). |
 | `show_position` | `false` pour masquer coordonnées, point de réapparition et lieu de la dernière mort. |
 | `show_inventory` | `false` pour masquer l'inventaire et le coffre de l'Ender. |
+| `plugins` | Fichier `backpack.db` de Minepacks et dossier des homes (étape 13). |
 | `score_weights` | Pondérations du score général (voir plus bas). |
 
 ## 5. Qui lance la synchronisation ?
@@ -337,7 +354,7 @@ positions et les inventaires sont alors réservés aux joueurs connectés ; le r
    console. Les commandes envoyées sont réglables (`whitelist_java`, `whitelist_bedrock`).
 
 3. Premier admin : faites votre propre demande sur le site, puis activez-la en admin sur le serveur
-   (personne ne peut devenir admin depuis le site) :
+   (le premier admin ne peut pas être créé depuis le site ; il pourra ensuite nommer les suivants) :
 
    ```bash
    php /var/www/html/mcstats/cron/admin.php VotrePseudo
@@ -347,11 +364,32 @@ positions et les inventaires sont alors réservés aux joueurs connectés ; le r
 
 ### Espace admin
 
-Le lien « Admin » de l'en-tête affiche le nombre de demandes en attente. Pour chaque demande : édition,
+Le lien « Admin » de l'en-tête affiche le nombre de demandes et de signalements à traiter. Pour chaque demande : édition,
 message du joueur, indication « Déjà whitelisté » et « A déjà joué sur le serveur », boutons Valider /
 Refuser. Pour les comptes : nouveau mot de passe provisoire (mot de passe oublié : le joueur devra le
 changer à sa prochaine connexion), désactivation, suppression. Désactiver ou supprimer un compte ne retire
 pas le joueur de la whitelist du serveur.
+
+« Rendre admin » (comptes actifs) et « Retirer admin » : tout admin peut nommer ou retirer d'autres admins,
+mais pas se retirer ses propres droits, pour qu'il reste toujours au moins un admin. Ce sont des droits sur
+le site uniquement : le joueur ne devient pas opérateur du serveur Minecraft.
+
+### Signalement d'usurpation
+
+Le site ne peut pas prouver qu'un joueur possède vraiment le compte Minecraft qu'il indique. Si quelqu'un
+demande un pseudo qui a déjà un compte (actif ou en attente), le site lui propose « Ce n'est pas toi ? » :
+il peut signaler une usurpation en indiquant son pseudo ou son identifiant Discord (obligatoire) et une
+explication.
+
+Le compte signalé **reste utilisable** jusqu'à la décision d'un admin. Dans l'espace admin, il remonte en
+tête de la liste avec l'étiquette « Révocation demandée », le Discord et le message ; le compteur de
+l'en-tête inclut les signalements. Après avoir contacté le joueur sur Discord :
+
+- **Révoquer** : supprime le compte et ferme ses sessions ; le vrai joueur peut alors refaire sa demande.
+  La whitelist du serveur n'est pas modifiée (retirez le joueur à la main si besoin).
+- **Ignorer le signalement** : le compte reste tel quel.
+
+Refuser une demande signalée clôt aussi le signalement. 3 signalements au maximum par adresse IP par heure.
 
 ### Sécurité
 
@@ -361,6 +399,45 @@ pas le joueur de la whitelist du serveur.
 - Formulaires protégés contre les requêtes intersites (jeton CSRF).
 - 5 échecs de connexion par pseudo en 15 minutes, puis blocage temporaire ; 5 demandes de whitelist par
   adresse IP par heure.
+
+## 13. Sac à dos et homes (plugins)
+
+Sur le profil d'un joueur, l'onglet « Sac à dos & homes » montre le contenu de son sac à dos
+([Minepacks](https://www.spigotmc.org/resources/minepacks.19286/)) et la liste de ses homes
+([UltimateHomes](https://www.spigotmc.org/resources/64210/) ou [EssentialsX](https://essentialsx.net)) : nom,
+dimension, coordonnées, avec un lien vers la carte quand Pl3xMap est installé.
+
+**Qui peut le voir ?** Il faut que les comptes soient activés (étape 12). Le joueur connecté voit l'onglet sur
+son propre profil, marqué du badge « Vous ». Les admins le voient sur tous les profils. Les visiteurs et les
+autres joueurs ne le voient pas.
+
+1. Dans `config.php` (chemins à adapter ; laisser `''` pour désactiver l'un ou l'autre) :
+
+   ```php
+   'plugins' => [
+       'minepacks_db' => '/opt/minecraft/plugins/Minepacks/backpack.db',
+       'homes_path'   => '/opt/minecraft/plugins/UltimateHomes/playerdata',
+   ],
+   ```
+
+   Pour EssentialsX, le dossier des homes est `plugins/Essentials/userdata`. Tout plugin qui écrit un
+   fichier `<uuid>.yml` par joueur avec une section `homes` (`x`, `y`, `z`, `world`) est lu de la même façon.
+
+2. Minepacks est lu avec l'extension SQLite de PHP :
+
+   ```bash
+   sudo apt install php-sqlite3
+   ```
+
+Les fichiers sont lus par la synchronisation, sous le compte du serveur Minecraft (étape 5) : Apache n'y
+accède jamais. Ils ne sont relus que lorsqu'ils changent, puis copiés dans la base du site. Le sac à dos
+affiché est celui que Minepacks a enregistré en dernier.
+
+L'espace admin indique en haut de page le nombre de joueurs lus pour chaque plugin, ou l'erreur rencontrée
+(fichier introuvable, extension manquante…). En cas d'erreur, les dernières données lues restent affichées.
+
+Seul le stockage SQLite de Minepacks est pris en charge (pas MySQL). Les sacs enregistrés dans un format
+trop ancien sont ignorés et comptés dans le journal de la synchronisation.
 
 ## Dépannage
 
@@ -377,6 +454,8 @@ pas le joueur de la whitelist du serveur.
 | « La carte n'est pas encore disponible » | Vérifier `'map' => ['enabled' => true]` dans `config.php`, et que Pl3xMap a bien créé `map/tiles/settings.json` (étape 11). |
 | « Connecte-toi pour voir la carte » alors qu'on veut une carte publique | Les comptes sont activés : la carte est réservée aux joueurs connectés. Mettre `'accounts' => ['enabled' => false]` pour tout rendre public. |
 | La validation d'une demande échoue (« connexion RCON impossible ») | Le serveur Minecraft doit être allumé, avec `enable-rcon=true` et le même mot de passe que `server.rcon_password`. |
+| Pas d'onglet « Sac à dos & homes » | Il n'apparaît qu'au joueur connecté sur son propre profil et aux admins. Vérifier la section `plugins` de `config.php`, puis l'état des plugins en haut de l'espace admin. |
+| « l'extension PHP SQLite est absente » dans l'espace admin | `sudo apt install php-sqlite3` ; la synchronisation suivante lira Minepacks. |
 | Carte grise ou trouée | Le rendu n'est pas terminé (`map status` dans la console), ou Apache ne peut pas lire les images : vérifier avec `ls -l /var/www/html/mcstats/map/tiles`. |
 
 ## Structure du projet

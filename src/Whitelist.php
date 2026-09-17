@@ -124,11 +124,12 @@ final class Whitelist
         if (!$existing && $uuid !== '') {
             $existing = Db::one('SELECT * FROM accounts WHERE uuid = ?', [$uuid]);
         }
+        // 'conflict' : permet à la page de proposer le signalement d'une usurpation
         if ($existing && $existing['status'] === 'pending') {
-            return $fail('Une demande est déjà en attente pour ce joueur.');
+            return ['conflict' => $existing['username']] + $fail('Une demande est déjà en attente pour ce joueur.');
         }
         if ($existing && $existing['status'] !== 'refused') {
-            return $fail('Un compte existe déjà pour ce joueur : connecte-toi.');
+            return ['conflict' => $existing['username']] + $fail('Un compte existe déjà pour ce joueur : connecte-toi.');
         }
 
         $now = time();
@@ -149,6 +150,61 @@ final class Whitelist
         }
         $account = Db::one('SELECT * FROM accounts WHERE username_lc = ?', [mb_strtolower($username)]);
         return ['ok' => true, 'error' => null, 'account' => $account, 'verified' => $verified];
+    }
+
+    // ---------------------------------------------------------------- Signalement d'usurpation
+
+    /**
+     * Un joueur signale qu'un compte a été créé avec son pseudo. Le compte reste actif :
+     * il est mis en avant dans l'espace admin, qui le révoque ou ignore le signalement.
+     * @return array ['ok' => bool, 'error' => ?string]
+     */
+    public static function report(string $username, string $discord, string $message): array
+    {
+        $fail = function (string $error) {
+            return ['ok' => false, 'error' => $error];
+        };
+        $discord = trim($discord);
+        $message = mb_substr(trim($message), 0, 500);
+        $acc = Db::one('SELECT id, status FROM accounts WHERE username_lc = ?', [mb_strtolower(trim($username))]);
+        if (!$acc || $acc['status'] === 'refused') {
+            return $fail("Aucun compte n'utilise ce pseudo : tu peux faire ta demande normalement.");
+        }
+        // pseudo Discord (nouveau format ou ancien avec #1234) ou identifiant numérique
+        if (!preg_match('/^(?:\d{17,20}|[A-Za-z0-9_.]{2,32}(?:#\d{4})?)$/', $discord)) {
+            return $fail('Indique ton pseudo Discord ou ton identifiant Discord, pour que l\'admin puisse te contacter.');
+        }
+        $key = 'report-ip:' . Auth::ip();
+        if (Auth::tooMany($key, 3, 3600)) {
+            return $fail('Trop de signalements depuis ta connexion. Réessaie dans une heure.');
+        }
+        Auth::hit($key);
+        Db::exec(
+            "INSERT INTO identity_reports (account_id, discord, message, ip, status, created_at) VALUES (?, ?, ?, ?, 'open', ?)",
+            [$acc['id'], $discord, $message, Auth::ip(), time()]
+        );
+        return ['ok' => true, 'error' => null];
+    }
+
+    /** Signalements en cours, regroupés par compte : account_id => [signalements…]. */
+    public static function openReports(): array
+    {
+        $out = [];
+        foreach (Db::all("SELECT * FROM identity_reports WHERE status = 'open' ORDER BY created_at DESC") as $r) {
+            $out[(int) $r['account_id']][] = $r;
+        }
+        return $out;
+    }
+
+    public static function openReportCount(): int
+    {
+        return (int) Db::value("SELECT COUNT(DISTINCT account_id) FROM identity_reports WHERE status = 'open'");
+    }
+
+    /** Clôt les signalements en cours d'un compte ('revoked' ou 'dismissed'). */
+    public static function closeReports(int $accountId, string $status): void
+    {
+        Db::exec("UPDATE identity_reports SET status = ?, decided_at = ? WHERE account_id = ? AND status = 'open'", [$status, time(), $accountId]);
     }
 
     // ---------------------------------------------------------------- Décision de l'admin
@@ -202,6 +258,7 @@ final class Whitelist
         }
         Db::exec("UPDATE accounts SET status = 'refused', decided_at = ? WHERE id = ?", [time(), $id]);
         Auth::dropSessions($id);
+        self::closeReports($id, 'revoked');
         return ['ok' => true, 'message' => "La demande de {$acc['username']} est refusée."];
     }
 

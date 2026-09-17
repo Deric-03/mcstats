@@ -96,6 +96,17 @@ return [
     ],
 
     // ------------------------------------------------------------------
+    // Plugins (voir README) : sac à dos et homes sur le profil du joueur.
+    // Visibles seulement par le joueur lui-même et par les admins (comptes activés).
+    // ------------------------------------------------------------------
+    'plugins' => [
+        // Minepacks, stockage SQLite : fichier backpack.db ('' = désactivé)
+        'minepacks_db' => '',   // ex. '/opt/minecraft/plugins/Minepacks/backpack.db'
+        // Homes : dossier contenant un fichier <uuid>.yml par joueur ('' = désactivé)
+        'homes_path'   => '',   // ex. '/opt/minecraft/plugins/Homes/playerdata' ou '/opt/minecraft/plugins/Essentials/userdata'
+    ],
+
+    // ------------------------------------------------------------------
     // Affichage
     // ------------------------------------------------------------------
     // Version de Minecraft pour les traductions / icônes ('' = dernière version stable)

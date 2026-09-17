@@ -47,6 +47,20 @@ final class Auth
         return $u !== null && !empty($u['is_admin']);
     }
 
+    /** Le profil de ce joueur appartient-il au compte connecté ? */
+    public static function owns(array $player): bool
+    {
+        $u = self::user();
+        if (!$u) {
+            return false;
+        }
+        if ($u['uuid'] !== '') {
+            return strtolower($u['uuid']) === strtolower((string) $player['uuid']);
+        }
+        // gamertag Bedrock non vérifié : pas d'UUID, on compare le pseudo
+        return (string) $player['name'] !== '' && mb_strtolower((string) $player['name']) === $u['username_lc'];
+    }
+
     /** Carte, positions et inventaires : réservés aux joueurs connectés quand les comptes sont activés. */
     public static function canSeePrivate(): bool
     {

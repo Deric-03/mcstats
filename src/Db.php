@@ -4,7 +4,7 @@
  */
 final class Db
 {
-    const SCHEMA_VERSION = 3;
+    const SCHEMA_VERSION = 5;
 
     /** Colonnes ajoutées après la première version (ajoutées automatiquement si absentes). */
     const EXTRA_COLUMNS = [
@@ -171,6 +171,27 @@ final class Db
         $pdo->exec('CREATE TABLE IF NOT EXISTS auth_attempts (
             k VARCHAR(120) NOT NULL,
             at BIGINT NOT NULL DEFAULT 0
+        )' . $suffix);
+
+        // Signalements d'usurpation : un joueur conteste un compte créé avec son pseudo
+        $pdo->exec("CREATE TABLE IF NOT EXISTS identity_reports (
+            $id,
+            account_id INT NOT NULL,
+            discord VARCHAR(40) NOT NULL DEFAULT '',
+            message VARCHAR(500) NOT NULL DEFAULT '',
+            ip VARCHAR(45) NOT NULL DEFAULT '',
+            status VARCHAR(12) NOT NULL DEFAULT 'open',
+            created_at BIGINT NOT NULL DEFAULT 0,
+            decided_at BIGINT NOT NULL DEFAULT 0
+        )" . $suffix);
+
+        // Données de plugins par joueur (sac à dos, homes), en JSON
+        $pdo->exec('CREATE TABLE IF NOT EXISTS plugin_data (
+            plugin VARCHAR(20) NOT NULL,
+            uuid CHAR(36) NOT NULL,
+            data MEDIUMTEXT NULL,
+            updated_at BIGINT NOT NULL DEFAULT 0,
+            PRIMARY KEY (plugin, uuid)
         )' . $suffix);
 
         // Colonnes de catégories (une par statistique classée)

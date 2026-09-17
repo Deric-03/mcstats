@@ -46,8 +46,8 @@ $favicon = Mc::iconUrl('grass_block');
     <?php if (Auth::enabled()): $me = Auth::user(); ?>
     <div class="account">
       <?php if ($me): ?>
-        <?php if (!empty($me['is_admin'])): $pendingCount = Auth::pendingCount(); ?>
-          <a class="account__admin<?= $nav === 'admin' ? ' is-active' : '' ?>" href="admin.php"<?= $pendingCount ? ' title="' . $pendingCount . ' demande(s) de whitelist en attente"' : '' ?>>Admin<?php if ($pendingCount): ?><span class="badge-count"><?= $pendingCount ?></span><?php endif; ?></a>
+        <?php if (!empty($me['is_admin'])): $pendingCount = Auth::pendingCount() + Whitelist::openReportCount(); ?>
+          <a class="account__admin<?= $nav === 'admin' ? ' is-active' : '' ?>" href="admin.php"<?= $pendingCount ? ' title="' . $pendingCount . ' demande(s) ou signalement(s) à traiter"' : '' ?>>Admin<?php if ($pendingCount): ?><span class="badge-count"><?= $pendingCount ?></span><?php endif; ?></a>
         <?php endif; ?>
         <a class="account__user<?= $nav === 'compte' ? ' is-active' : '' ?>" href="compte.php" title="Mon compte"><?= head_img($me['uuid'] !== '' ? $me['uuid'] : $me['username'], 24) ?><span><?= h($me['username']) ?></span></a>
       <?php else: $here = safe_return(basename((string) $_SERVER['SCRIPT_NAME']) . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SERVER['QUERY_STRING'] : '')); ?>

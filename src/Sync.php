@@ -261,6 +261,9 @@ final class Sync
         Db::exec('DELETE FROM player_history WHERE day < ?', [date('Y-m-d', $now - 400 * 86400)]);
         $pdo->commit();
 
+        // Plugins (sac à dos, homes) : en dehors de la transaction principale
+        Plugins::sync($force, $log);
+
         // Skins : en dehors de la transaction (requêtes réseau)
         $skins = self::updateSkins($cli, $now);
 
@@ -495,7 +498,7 @@ final class Sync
     }
 
     /** Réduit un objet NBT à ce que le site affiche. */
-    private static function simplifyItem(array $it, int $depth = 0): array
+    public static function simplifyItem(array $it, int $depth = 0): array
     {
         $o = [
             'id'    => Mc::strip($it['id'] ?? 'air'),

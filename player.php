@@ -73,6 +73,26 @@ $total = Repo::count();
 $showInv = App::cfg('show_inventory', true) && $pd;
 $showPos = App::cfg('show_position', true) && $pd;
 
+// Profil du joueur connecté, sac à dos et homes (visibles par le joueur lui-même et les admins)
+$isMe = Auth::owns($player);
+$pluginsTab = '';
+if (Plugins::canSee($player)) {
+    $hasBackpack = Plugins::enabled('backpack');
+    $hasHomes = Plugins::enabled('homes');
+    $pluginsTab = $hasBackpack && $hasHomes ? 'Sac à dos & homes' : ($hasBackpack ? 'Sac à dos' : 'Homes');
+    $backpack = $hasBackpack ? Plugins::data('backpack', $uuid) : null;
+    $homes = $hasHomes ? (Plugins::data('homes', $uuid)['homes'] ?? []) : [];
+    $mapWorlds = $homes && MapData::enabled() ? MapData::worlds() : [];
+    $homeWorld = function (string $world) use ($mapWorlds) {
+        $type = MapData::typeOf($world);
+        $label = isset($mapWorlds[$world]) ? $mapWorlds[$world]['label'] : MapData::LABELS[$type];
+        if (!isset($mapWorlds[$world]) && !in_array($world, ['', 'world', 'world_nether', 'world_the_end'], true)) {
+            $label .= " ($world)";
+        }
+        return mc_icon(['overworld' => 'grass_block', 'nether' => 'netherrack', 'end' => 'end_stone'][$type], $label) . '<span class="homes-table__label">' . h($label) . '</span>';
+    };
+}
+
 const MOVE_ICONS = [
     'walk_one_cm' => 'iron_boots', 'sprint_one_cm' => 'sugar', 'crouch_one_cm' => 'chainmail_leggings',
     'swim_one_cm' => 'water_bucket', 'walk_on_water_one_cm' => 'lily_pad', 'walk_under_water_one_cm' => 'turtle_helmet',
@@ -174,6 +194,7 @@ require APP_ROOT . '/templates/header.php';
     <div class="profile__title">
       <?= head_img($uuid, 40, 'head profile__head') ?>
       <h1><?= h($name) ?></h1>
+      <?php if ($isMe): ?><span class="you-badge">Vous</span><?php endif; ?>
       <?php if (App::cfg('server.enabled', true)): $isOnline = !empty($player['online']); ?>
       <span class="status-badge <?= $isOnline ? 'is-online' : 'is-offline' ?>" data-online-badge="<?= h($uuid) ?>"><span class="dot"></span><span data-badge-text><?=
         $isOnline ? 'En ligne' . ((int) $player['online_since'] > 0 ? ' depuis ' . h(fmt_duration(time() - (int) $player['online_since'])) : '') : 'Hors ligne'
@@ -211,6 +232,7 @@ require APP_ROOT . '/templates/header.php';
   <button type="button" role="tab" data-tab="deplacements" aria-selected="false">Déplacements</button>
   <button type="button" role="tab" data-tab="succes" aria-selected="false">Succès</button>
   <?php if ($pd): ?><button type="button" role="tab" data-tab="inventaire" aria-selected="false"><?= $showInv ? 'Inventaire &amp; état' : 'État' ?></button><?php endif; ?>
+  <?php if ($pluginsTab !== ''): ?><button type="button" role="tab" data-tab="perso" aria-selected="false"><?= h($pluginsTab) ?></button><?php endif; ?>
   <button type="button" role="tab" data-tab="stats" aria-selected="false">Toutes les stats</button>
 </div>
 
@@ -462,6 +484,49 @@ require APP_ROOT . '/templates/header.php';
     </div>
   </div>
   <?php endif; ?>
+</section>
+<?php endif; ?>
+
+<?php if ($pluginsTab !== ''): ?>
+<!-- Sac à dos & homes -->
+<section class="panel stack" id="panel-perso" role="tabpanel" aria-label="<?= h($pluginsTab) ?>">
+  <p class="private-note"><?= mc_icon('tripwire_hook') ?><span><?= $isMe ? 'Visible uniquement par vous et les admins du site.' : 'Visible uniquement par ' . h($name) . ' et les admins du site.' ?></span></p>
+  <div class="perso-layout <?= $hasBackpack && $hasHomes ? 'inv-layout' : 'stack' ?>">
+    <?php if ($hasBackpack): ?>
+    <div class="card card-pad">
+      <div class="card__head"><h3>Sac à dos</h3><?php if ($backpack): ?><span class="muted"><?= count($backpack['items']) ?> / <?= (int) $backpack['size'] ?> emplacements</span><?php endif; ?></div>
+      <?php if ($backpack): ?>
+        <?= item_grid($backpack['items'], 0, (int) $backpack['size']) ?>
+        <?php if (!empty($backpack['updated'])): ?><p class="muted empty-note">Dernière sauvegarde le <?= h(fmt_date($backpack['updated'])) ?></p><?php endif; ?>
+      <?php else: ?>
+        <p class="muted empty-note">Aucun sac à dos enregistré.</p>
+      <?php endif; ?>
+    </div>
+    <?php endif; ?>
+    <?php if ($hasHomes): ?>
+    <div class="card card-pad">
+      <div class="card__head"><h3>Homes</h3><span class="muted"><?= count($homes) ?></span></div>
+      <?php if ($homes): ?>
+      <div class="table-wrap">
+        <table class="table table--compact homes-table">
+          <thead><tr><th>Nom</th><th>Monde</th><th>Coordonnées</th></tr></thead>
+          <tbody>
+          <?php foreach ($homes as $home): ?>
+            <tr>
+              <td class="strong"><?= h($home['name']) ?></td>
+              <td><span class="homes-table__world"><?= $homeWorld($home['world']) ?></span></td>
+              <td><?php if (isset($mapWorlds[$home['world']])): ?><a class="link-more" href="carte.php?<?= h(http_build_query(['w' => $home['world'], 'x' => $home['pos'][0], 'z' => $home['pos'][2]])) ?>" title="Voir sur la carte"><?= h(coords($home['pos'])) ?></a><?php else: ?><?= h(coords($home['pos'])) ?><?php endif; ?></td>
+            </tr>
+          <?php endforeach; ?>
+          </tbody>
+        </table>
+      </div>
+      <?php else: ?>
+        <p class="muted empty-note">Aucun home enregistré.</p>
+      <?php endif; ?>
+    </div>
+    <?php endif; ?>
+  </div>
 </section>
 <?php endif; ?>
 

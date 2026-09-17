@@ -201,6 +201,11 @@ a.chip:hover { border-color: var(--border-strong); color: var(--text); }
 }
 .status-badge.is-online { background: rgba(12, 163, 12, .12); border-color: rgba(12, 163, 12, .45); }
 .text-online { color: #3fd23f; font-weight: 600; }
+.you-badge {
+  display: inline-flex; align-items: center; padding: 4px 10px; border-radius: 999px;
+  background: var(--accent-soft); border: 1px solid rgba(94, 194, 105, .45); color: var(--accent);
+  font-size: 13px; font-weight: 700; white-space: nowrap;
+}
 
 /* --------------------------------------------------------------------------
    Tuiles
@@ -688,6 +693,25 @@ textarea.input { height: auto; min-height: 84px; padding: 10px 12px; line-height
 .accounts-table td { vertical-align: middle; }
 .accounts-table .player-link { margin-right: 6px; }
 .accounts-table__actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.accounts-table tr.is-flagged td { background: rgba(229, 72, 77, .06); }
+.flag {
+  display: flex; flex-direction: column; gap: 2px; margin-top: 8px; padding: 8px 10px;
+  border-left: 3px solid var(--danger); border-radius: 0 8px 8px 0; background: rgba(229, 72, 77, .08); font-size: 13px;
+}
+.flag__head strong { color: #ff8a8d; }
+.flag__head code { font-family: var(--mono); color: var(--text); }
+.flag__message { color: var(--text-2); overflow-wrap: anywhere; }
+.report-box { border-color: rgba(229, 72, 77, .35); }
+
+/* Sac à dos & homes */
+.private-note { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 14px; }
+.perso-layout > * { min-width: 0; }
+.homes-table__world { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.homes-table__world .mc-icon { width: 18px; height: 18px; }
+.homes-table .link-more { font-size: inherit; white-space: normal; }
+@media (max-width: 600px) {
+  .homes-table__label { display: none; }
+}
 
 /* Pied de page */
 .footer { padding: 20px 0; border-top: 1px solid var(--border); color: var(--text-2); font-size: 13px; }
