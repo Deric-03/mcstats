@@ -112,14 +112,16 @@ $nav = 'admin';
 require APP_ROOT . '/templates/header.php';
 ?>
 <div class="auth-wrap auth-wrap--wide">
-  <div class="page-head">
-    <h1><?= $account ? 'Journal de ' . h($name) : 'Journal du site' ?></h1>
-    <p class="muted">
-      <a class="link-more" href="admin.php">← Espace admin</a>
-      <?php if ($account && $player): ?> · <a class="link-more" href="<?= h(player_url($player)) ?>">Profil du joueur →</a><?php endif; ?>
-      <?php if (!ServerLog::enabled()): ?> · Journal du serveur non configuré (section <code>server_log</code> de <code>config.php</code>)
-      <?php elseif (!empty($logStatus['error'])): ?> · <span class="text-danger"><?= h($logStatus['error']) ?></span><?php endif; ?>
-    </p>
+  <div class="page-head page-head--row">
+    <div>
+      <h1><?= $account ? 'Journal de ' . h($name) : 'Journal du site' ?></h1>
+      <?php if (!ServerLog::enabled()): ?>
+        <p class="muted">Journal du serveur non configuré (section <code>server_log</code> de <code>config.php</code>)</p>
+      <?php elseif (!empty($logStatus['error'])): ?>
+        <p class="muted">Journal du serveur : <span class="text-danger"><?= h($logStatus['error']) ?></span></p>
+      <?php endif; ?>
+    </div>
+    <a class="btn btn--sm btn--ghost" href="admin.php">← Espace admin</a>
   </div>
 
   <section class="stack">

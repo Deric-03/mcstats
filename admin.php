@@ -278,7 +278,11 @@ require APP_ROOT . '/templates/header.php';
         <tbody>
         <?php foreach ($accounts as $a): $self = (int) $a['id'] === (int) $me['id']; $flagged = isset($reports[(int) $a['id']]); ?>
           <tr<?= $flagged ? ' class="is-flagged"' : '' ?>>
-            <td><span class="player-link"><?= head_img($a['uuid'] !== '' ? $a['uuid'] : $a['username'], 24) ?><span><?= h($a['username']) ?></span></span>
+            <td><?php if ($hasPlayed($a)): ?>
+              <a class="player-link" href="player.php?p=<?= h(rawurlencode($a['username'])) ?>" title="Voir le profil de <?= h($a['username']) ?>"><?= head_img($a['uuid'] !== '' ? $a['uuid'] : $a['username'], 24) ?><span><?= h($a['username']) ?></span></a>
+            <?php else: ?>
+              <span class="player-link"><?= head_img($a['uuid'] !== '' ? $a['uuid'] : $a['username'], 24) ?><span><?= h($a['username']) ?></span></span>
+            <?php endif; ?>
               <span class="tag"><?= $a['edition'] === 'bedrock' ? 'Bedrock' : 'Java' ?></span><?php if ($isOwnerAccount($a)): ?> <span class="tag tag--ok" title="Les autres admins n'ont aucun droit sur ce compte">Admin principal</span><?php elseif (!empty($a['is_admin'])): ?> <span class="tag tag--ok">Admin</span><?php endif; ?><?php if (!empty($a['can_console']) && !$isOwnerAccount($a)): ?> <span class="tag" title="Peut envoyer des commandes au serveur">Terminal</span><?php endif; ?>
               <?= $reportDetails($a) ?></td>
             <td><?= account_status_tag($a['status']) ?><?php if ($isBanned($a)): ?> <span class="tag tag--danger" title="Banni du serveur Minecraft">Banni</span><?php endif; ?><?php if ($flagged): ?> <span class="tag tag--danger">Révocation demandée</span><?php endif; ?></td>
