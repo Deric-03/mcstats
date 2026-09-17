@@ -362,6 +362,8 @@ positions et les inventaires sont alors réservés aux joueurs connectés ; le r
 
    `php cron/admin.php --liste` affiche les admins, `php cron/admin.php Pseudo --retirer` retire les droits.
 
+   Ce premier admin devient l'**admin principal** (voir ci-dessous).
+
 ### Espace admin
 
 Le lien « Admin » de l'en-tête affiche le nombre de demandes et de signalements à traiter. Pour chaque demande : édition,
@@ -381,6 +383,29 @@ Chaque compte de la liste a un menu **« Actions »** :
 
 Tout admin peut nommer ou retirer d'autres admins, mais pas se retirer ses propres droits, pour qu'il reste
 toujours au moins un admin. De même, on ne peut ni s'expulser, ni se bannir, ni se supprimer soi-même.
+
+### Admin principal
+
+Un compte est l'**admin principal** : les autres admins n'ont aucun droit sur lui. Concrètement, son compte
+porte l'étiquette « Admin principal », son menu Actions est remplacé par « Protégé », et pour les autres
+admins :
+
+- aucune action possible sur lui (mot de passe, désactivation, droits admin, expulsion, bannissement,
+  suppression…), même en envoyant la requête à la main ;
+- son journal est refusé, et ce qui le concerne est retiré du « Journal du site » ;
+- son sac à dos, ses homes et son coffre de l'Ender restent invisibles sur son profil.
+
+Ce qu'il a fait sur les autres comptes reste visible dans leur journal à eux : sans cela, l'historique de
+ces comptes serait trompeur.
+
+Par défaut, c'est le premier admin (le plus ancien). Pour désigner quelqu'un d'autre, depuis le serveur —
+personne ne peut le faire depuis le site :
+
+```bash
+php /var/www/html/mcstats/cron/admin.php Pseudo --principal
+```
+
+`php cron/admin.php --liste` indique lequel des admins est le principal.
 
 ### Expulser et bannir
 

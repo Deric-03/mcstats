@@ -28,6 +28,9 @@ final class Plugins
     /** Sac à dos et homes : visibles par le joueur lui-même et par les admins (comptes activés). */
     public static function canSee(array $player): bool
     {
+        if (Auth::isProtectedPlayer($player)) {
+            return false;   // l'admin principal n'est visible que par lui-même
+        }
         return self::enabled() && Auth::enabled() && (Auth::isAdmin() || Auth::owns($player));
     }
 

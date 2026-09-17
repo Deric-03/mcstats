@@ -33,6 +33,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         [$flashOk, $flash] = [false, 'La page a expiré : réessaie.'];
     } elseif (!$target) {
         [$flashOk, $flash] = [false, 'Compte introuvable.'];
+    } elseif (Auth::isProtected($target)) {
+        [$flashOk, $flash] = [false, "{$target['username']} est l'admin principal : aucun autre admin ne peut agir sur son compte."];
     } elseif ((int) $target['id'] === (int) $me['id'] && in_array($action, ['disable', 'delete', 'refuse', 'revoke', 'demote', 'kick', 'ban'], true)) {
         [$flashOk, $flash] = [false, 'Tu ne peux pas faire ça sur ton propre compte.'];
     } else {
@@ -142,6 +144,10 @@ $hasPlayed = function (array $a) use ($played) {
     return ($a['uuid'] !== '' && isset($played[$a['uuid']])) || isset($played['name:' . $a['username_lc']]);
 };
 $rconState = Rcon::configured() ? ($pending && $serverWhitelist === null ? 'erreur' : 'actif') : 'off';
+$owner = Auth::owner();
+$isOwnerAccount = function (array $a) use ($owner) {
+    return $owner && (int) $a['id'] === (int) $owner['id'];
+};
 $serverBans = Rcon::configured() ? Whitelist::serverBans() : null;
 $isBanned = function (array $a) use ($serverBans) {
     return $serverBans !== null && isset($serverBans[$a['username_lc']]);
@@ -255,12 +261,15 @@ require APP_ROOT . '/templates/header.php';
         <?php foreach ($accounts as $a): $self = (int) $a['id'] === (int) $me['id']; $flagged = isset($reports[(int) $a['id']]); ?>
           <tr<?= $flagged ? ' class="is-flagged"' : '' ?>>
             <td><span class="player-link"><?= head_img($a['uuid'] !== '' ? $a['uuid'] : $a['username'], 24) ?><span><?= h($a['username']) ?></span></span>
-              <span class="tag"><?= $a['edition'] === 'bedrock' ? 'Bedrock' : 'Java' ?></span><?php if (!empty($a['is_admin'])): ?> <span class="tag tag--ok">Admin</span><?php endif; ?>
+              <span class="tag"><?= $a['edition'] === 'bedrock' ? 'Bedrock' : 'Java' ?></span><?php if ($isOwnerAccount($a)): ?> <span class="tag tag--ok" title="Les autres admins n'ont aucun droit sur ce compte">Admin principal</span><?php elseif (!empty($a['is_admin'])): ?> <span class="tag tag--ok">Admin</span><?php endif; ?>
               <?= $reportDetails($a) ?></td>
             <td><?= account_status_tag($a['status']) ?><?php if ($isBanned($a)): ?> <span class="tag tag--danger" title="Banni du serveur Minecraft">Banni</span><?php endif; ?><?php if ($flagged): ?> <span class="tag tag--danger">Révocation demandée</span><?php endif; ?></td>
             <td class="hide-md muted"><?= h(fmt_date($a['decided_at'] ?: $a['created_at'])) ?></td>
             <td class="hide-md muted"><?= h($a['last_login'] ? fmt_ago($a['last_login']) : 'jamais') ?></td>
             <td class="accounts-table__actions">
+              <?php if (Auth::isProtected($a)): ?>
+                <span class="muted" title="Compte de l'admin principal : actions et journal réservés">Protégé</span>
+              <?php else: ?>
               <details class="menu">
                 <summary class="menu__button">Actions<span class="menu__chevron" aria-hidden="true"></span></summary>
                 <div class="menu__list">
@@ -299,6 +308,7 @@ require APP_ROOT . '/templates/header.php';
                   <?php endif; ?>
                 </div>
               </details>
+              <?php endif; ?>
             </td>
           </tr>
         <?php endforeach; ?>

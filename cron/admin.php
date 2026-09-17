@@ -2,9 +2,10 @@
 /**
  * Gestion des admins du site en ligne de commande (réservé à qui a accès au serveur).
  *
- *   php cron/admin.php <pseudo>             active le compte et le rend admin
- *   php cron/admin.php <pseudo> --retirer   retire les droits admin
- *   php cron/admin.php --liste              liste les comptes admin
+ *   php cron/admin.php <pseudo>              active le compte et le rend admin
+ *   php cron/admin.php <pseudo> --principal  le désigne admin principal (protégé des autres admins)
+ *   php cron/admin.php <pseudo> --retirer    retire les droits admin
+ *   php cron/admin.php --liste               liste les comptes admin
  *
  * Le compte doit d'abord exister : fais ta demande de whitelist sur le site, puis lance cette commande.
  */
@@ -20,9 +21,11 @@ if (!$args || in_array('--help', $args, true) || in_array('-h', $args, true)) {
     exit($args ? 0 : 1);
 }
 if (in_array('--liste', $args, true)) {
-    $admins = Db::all('SELECT username, status FROM accounts WHERE is_admin = 1 ORDER BY username_lc');
-    echo $admins ? implode(PHP_EOL, array_map(function ($a) {
-        return $a['username'] . ' (' . (Whitelist::STATUS_LABELS[$a['status']] ?? $a['status']) . ')';
+    $admins = Db::all('SELECT * FROM accounts WHERE is_admin = 1 ORDER BY username_lc');
+    $owner = Auth::owner();
+    echo $admins ? implode(PHP_EOL, array_map(function ($a) use ($owner) {
+        $principal = $owner && (int) $owner['id'] === (int) $a['id'] ? ', principal' : '';
+        return $a['username'] . ' (' . (Whitelist::STATUS_LABELS[$a['status']] ?? $a['status']) . $principal . ')';
     }, $admins)) . PHP_EOL : "Aucun admin.\n";
     exit(0);
 }
@@ -39,8 +42,15 @@ if (!$account) {
     exit(1);
 }
 if (in_array('--retirer', $args, true)) {
-    Db::exec('UPDATE accounts SET is_admin = 0 WHERE id = ?', [$account['id']]);
+    Db::exec('UPDATE accounts SET is_admin = 0, is_owner = 0 WHERE id = ?', [$account['id']]);
     echo "{$account['username']} n'est plus admin.\n";
+    exit(0);
+}
+if (in_array('--principal', $args, true)) {
+    Db::exec('UPDATE accounts SET is_owner = 0 WHERE is_owner = 1');
+    Db::exec("UPDATE accounts SET is_admin = 1, is_owner = 1, status = 'active' WHERE id = ?", [$account['id']]);
+    echo "{$account['username']} est l'admin principal : les autres admins ne peuvent rien faire sur son compte,\n"
+        . "ni voir son journal, son sac à dos, ses homes ou son coffre de l'Ender.\n";
     exit(0);
 }
 Db::exec("UPDATE accounts SET is_admin = 1, status = 'active', decided_at = CASE WHEN decided_at = 0 THEN ? ELSE decided_at END WHERE id = ?", [time(), $account['id']]);

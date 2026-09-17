@@ -16,12 +16,33 @@ if ($which !== 'all' && !$account) {
     exit;
 }
 
+if ($account && Auth::isProtected($account)) {
+    http_response_code(403);
+    $pageTitle = 'Journal';
+    require APP_ROOT . '/templates/header.php';
+    echo '<div class="auth-wrap"><div class="card empty"><p><strong>Journal réservé à l\'admin principal.</strong></p>'
+        . '<p class="muted">Le compte de ' . h($account['username']) . " n'est pas consultable par les autres admins.</p>"
+        . '<p class="muted"><a class="link-more" href="admin.php">Retour à l\'espace admin</a></p></div></div>';
+    require APP_ROOT . '/templates/footer.php';
+    exit;
+}
+
 $player = $account ? Repo::findPlayer($account['uuid'] !== '' ? $account['uuid'] : $account['username']) : null;
 $name = $account ? $account['username'] : '';
 $actions = $account ? Journal::forAccount($account) : Journal::recent(150);
 $events = ServerLog::enabled() ? ($account ? ServerLog::forPlayer($name) : ServerLog::recent(150)) : [];
 $sessions = $account && $player ? Journal::sessions($player['uuid'], 40) : [];
 $week = $sessions ? Journal::timeSince($sessions, time() - 7 * 86400) : 0;
+// Journal du site : ce qui concerne l'admin principal est retiré pour les autres admins
+$hidden = !$account && Auth::owner() && !Auth::isOwner() ? mb_strtolower((string) Auth::owner()['username_lc']) : '';
+if ($hidden !== '') {
+    $actions = array_values(array_filter($actions, function ($r) use ($hidden) {
+        return mb_strtolower((string) $r['username_lc']) !== $hidden;
+    }));
+    $events = array_values(array_filter($events, function ($e) use ($hidden) {
+        return mb_strtolower((string) $e['player_lc']) !== $hidden;
+    }));
+}
 $logStatus = ServerLog::status();
 $mapWorlds = MapData::enabled() ? MapData::worlds() : [];
 $knownPlayers = [];

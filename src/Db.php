@@ -4,7 +4,7 @@
  */
 final class Db
 {
-    const SCHEMA_VERSION = 7;
+    const SCHEMA_VERSION = 8;
 
     /** Colonnes ajoutées après la première version (ajoutées automatiquement si absentes). */
     const EXTRA_COLUMNS = [
@@ -153,6 +153,7 @@ final class Db
             password_hash VARCHAR(255) NOT NULL,
             status VARCHAR(12) NOT NULL DEFAULT 'pending',
             is_admin TINYINT NOT NULL DEFAULT 0,
+            is_owner TINYINT NOT NULL DEFAULT 0,
             must_change_password TINYINT NOT NULL DEFAULT 0,
             message VARCHAR(500) NOT NULL DEFAULT '',
             admin_note VARCHAR(500) NOT NULL DEFAULT '',
@@ -160,6 +161,9 @@ final class Db
             decided_at BIGINT NOT NULL DEFAULT 0,
             last_login BIGINT NOT NULL DEFAULT 0
         )" . $suffix);
+
+        // compte protégé : l'admin principal, sur lequel les autres admins n'ont aucun droit
+        self::addColumns($pdo, 'accounts', ['is_owner' => 'TINYINT NOT NULL DEFAULT 0']);
 
         $pdo->exec('CREATE TABLE IF NOT EXISTS auth_sessions (
             token_hash CHAR(64) NOT NULL PRIMARY KEY,

@@ -16,6 +16,9 @@ final class Auth
     /** @var array|null|false false = pas encore cherché */
     private static $user = false;
 
+    /** @var array|null|false l'admin principal, false = pas encore cherché */
+    private static $owner = false;
+
     public static function enabled(): bool
     {
         return (bool) App::cfg('accounts.enabled', false);
@@ -45,6 +48,47 @@ final class Auth
     {
         $u = self::user();
         return $u !== null && !empty($u['is_admin']);
+    }
+
+    /**
+     * Admin principal : le compte marqué is_owner, sinon le plus ancien admin.
+     * Les autres admins n'ont aucun droit sur lui (actions, journal, contenus privés).
+     */
+    public static function owner(): ?array
+    {
+        if (self::$owner === false) {
+            self::$owner = Db::one('SELECT * FROM accounts WHERE is_owner = 1 ORDER BY id ASC LIMIT 1')
+                ?: Db::one('SELECT * FROM accounts WHERE is_admin = 1 ORDER BY id ASC LIMIT 1');
+        }
+        return self::$owner;
+    }
+
+    /** Le compte connecté est-il l'admin principal ? */
+    public static function isOwner(): bool
+    {
+        $u = self::user();
+        $o = self::owner();
+        return $u !== null && $o !== null && (int) $u['id'] === (int) $o['id'];
+    }
+
+    /** Ce compte est-il l'admin principal vu par quelqu'un d'autre ? (intouchable) */
+    public static function isProtected(?array $account): bool
+    {
+        $o = self::owner();
+        return $account && $o && (int) $account['id'] === (int) $o['id'] && !self::isOwner();
+    }
+
+    /** Ce joueur est-il l'admin principal, vu par quelqu'un d'autre ? */
+    public static function isProtectedPlayer(array $player): bool
+    {
+        $o = self::owner();
+        if (!$o || self::isOwner()) {
+            return false;
+        }
+        if ($o['uuid'] !== '' && $player['uuid'] !== '') {
+            return strtolower($o['uuid']) === strtolower((string) $player['uuid']);
+        }
+        return (string) $player['name'] !== '' && mb_strtolower((string) $player['name']) === $o['username_lc'];
     }
 
     /** Le profil de ce joueur appartient-il au compte connecté ? */
