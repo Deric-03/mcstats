@@ -71,6 +71,26 @@ final class Auth
         return $u !== null && $o !== null && (int) $u['id'] === (int) $o['id'];
     }
 
+    /**
+     * Terminal du serveur : l'admin principal l'a toujours ; les autres admins seulement
+     * si l'admin principal leur a donné le droit.
+     */
+    public static function canConsole(): bool
+    {
+        $u = self::user();
+        if (!$u || empty($u['is_admin'])) {
+            return false;
+        }
+        return self::isOwner() || !empty($u['can_console']);
+    }
+
+    /** Pseudo de l'admin principal (pour le protéger des commandes envoyées par les autres). */
+    public static function ownerName(): string
+    {
+        $o = self::owner();
+        return $o ? (string) $o['username'] : '';
+    }
+
     /** Ce compte est-il l'admin principal vu par quelqu'un d'autre ? (intouchable) */
     public static function isProtected(?array $account): bool
     {

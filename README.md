@@ -379,6 +379,7 @@ Chaque compte de la liste a un menu **« Actions »** :
 | Rendre admin / Retirer les droits admin | Droits sur le site uniquement : le joueur ne devient pas opérateur du serveur Minecraft. |
 | Expulser du serveur | Déconnecte le joueur s'il est en ligne (RCON). |
 | Bannir du serveur / Lever le bannissement | Bannit sur le serveur (RCON) et désactive le compte du site. |
+| Donner / Retirer le terminal | Ouvre ou ferme l'accès au terminal du serveur. Réservé à l'admin principal. |
 | Supprimer le compte | Efface le compte du site. Le joueur reste dans la whitelist du serveur. |
 
 Tout admin peut nommer ou retirer d'autres admins, mais pas se retirer ses propres droits, pour qu'il reste
@@ -406,6 +407,23 @@ php /var/www/html/mcstats/cron/admin.php Pseudo --principal
 ```
 
 `php cron/admin.php --liste` indique lequel des admins est le principal.
+
+### Terminal du serveur
+
+Le bouton **« Terminal »**, en haut de l'espace admin, ouvre une console qui envoie des commandes au serveur
+Minecraft par RCON et affiche sa réponse, comme la console du serveur.
+
+- **Seul l'admin principal y a accès** au départ. Il peut l'ouvrir à un autre admin depuis le menu Actions
+  de son compte (« Donner le terminal » / « Retirer le terminal ») ; ce compte porte alors l'étiquette
+  « Terminal ». Personne d'autre ne peut donner ce droit.
+- **Tout est enregistré au journal** : la commande et la réponse, avec l'auteur. L'admin principal voit les
+  commandes de tout le monde, les autres seulement les leurs.
+- Les commandes qui **visent l'admin principal** (son pseudo) sont refusées pour les autres admins, et la
+  tentative est notée au journal.
+- La barre oblique est facultative (`/list` ou `list`), 60 commandes par minute au maximum.
+
+Ce droit donne le contrôle du serveur Minecraft (bannir, opérer, arrêter…) : ne l'accordez qu'à des
+personnes de confiance. Il demande RCON (voir plus haut).
 
 ### Expulser et bannir
 

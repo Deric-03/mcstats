@@ -23,6 +23,9 @@ final class Journal
         'kick'    => 'Expulsé du serveur',
         'ban'     => 'Banni du serveur',
         'unban'   => 'Bannissement levé',
+        'console' => 'Commande serveur',
+        'console_on'  => 'Accès au terminal donné',
+        'console_off' => 'Accès au terminal retiré',
     ];
 
     /** Actions à afficher en rouge dans le journal. */

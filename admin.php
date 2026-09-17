@@ -72,6 +72,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 Db::exec("UPDATE accounts SET status = 'active' WHERE id = ?", [$id]);
                 $flash = "Le compte de {$target['username']} est réactivé.";
                 break;
+            case 'console_on':
+            case 'console_off':
+                if (!Auth::isOwner()) {
+                    [$flashOk, $flash] = [false, "Seul l'admin principal donne ou retire l'accès au terminal."];
+                    break;
+                }
+                $on = $action === 'console_on' ? 1 : 0;
+                Db::exec('UPDATE accounts SET can_console = ? WHERE id = ?', [$on, $id]);
+                $flash = $on
+                    ? "{$target['username']} a maintenant accès au terminal du serveur."
+                    : "{$target['username']} n'a plus accès au terminal du serveur.";
+                break;
             case 'promote':
                 if ($target['status'] !== 'active') {
                     [$flashOk, $flash] = [false, "Le compte de {$target['username']} doit être actif pour devenir admin."];
@@ -183,8 +195,9 @@ $menuSep = '<span class="menu__sep"></span>';
 require APP_ROOT . '/templates/header.php';
 ?>
 <div class="auth-wrap auth-wrap--wide">
-  <div class="page-head">
-    <h1>Administration <a class="link-more page-head__link" href="admin.php?log=all">Journal du site →</a></h1>
+  <div class="page-head page-head--row">
+    <div class="page-head__main">
+    <h1>Administration</h1>
     <p class="muted">
       <?php if ($rconState === 'actif'): ?>RCON actif : les joueurs validés sont ajoutés automatiquement à la whitelist.
       <?php elseif ($rconState === 'erreur'): ?><span class="text-danger">RCON configuré mais le serveur ne répond pas</span> : la validation échouera tant que le serveur Minecraft est éteint ou que RCON est désactivé.
@@ -212,6 +225,11 @@ require APP_ROOT . '/templates/header.php';
     <?php $logInfo = ServerLog::status(); if (ServerLog::enabled() && !empty($logInfo['error'])): ?>
     <p class="muted">Journal du serveur : <span class="text-danger"><?= h($logInfo['error']) ?></span></p>
     <?php endif; ?>
+    </div>
+    <div class="page-head__actions">
+      <a class="btn btn--sm btn--ghost" href="admin.php?log=all"><?= mc_icon('book') ?>Journal du site</a>
+      <?php if (Auth::canConsole()): ?><a class="btn btn--sm btn--ghost" href="console.php"><?= mc_icon('command_block') ?>Terminal</a><?php endif; ?>
+    </div>
   </div>
 
   <?php if ($flash): ?><div class="alert <?= $flashOk ? 'alert--ok' : 'alert--error' ?>" role="status"><?= h($flash) ?></div><?php endif; ?>
@@ -261,7 +279,7 @@ require APP_ROOT . '/templates/header.php';
         <?php foreach ($accounts as $a): $self = (int) $a['id'] === (int) $me['id']; $flagged = isset($reports[(int) $a['id']]); ?>
           <tr<?= $flagged ? ' class="is-flagged"' : '' ?>>
             <td><span class="player-link"><?= head_img($a['uuid'] !== '' ? $a['uuid'] : $a['username'], 24) ?><span><?= h($a['username']) ?></span></span>
-              <span class="tag"><?= $a['edition'] === 'bedrock' ? 'Bedrock' : 'Java' ?></span><?php if ($isOwnerAccount($a)): ?> <span class="tag tag--ok" title="Les autres admins n'ont aucun droit sur ce compte">Admin principal</span><?php elseif (!empty($a['is_admin'])): ?> <span class="tag tag--ok">Admin</span><?php endif; ?>
+              <span class="tag"><?= $a['edition'] === 'bedrock' ? 'Bedrock' : 'Java' ?></span><?php if ($isOwnerAccount($a)): ?> <span class="tag tag--ok" title="Les autres admins n'ont aucun droit sur ce compte">Admin principal</span><?php elseif (!empty($a['is_admin'])): ?> <span class="tag tag--ok">Admin</span><?php endif; ?><?php if (!empty($a['can_console']) && !$isOwnerAccount($a)): ?> <span class="tag" title="Peut envoyer des commandes au serveur">Terminal</span><?php endif; ?>
               <?= $reportDetails($a) ?></td>
             <td><?= account_status_tag($a['status']) ?><?php if ($isBanned($a)): ?> <span class="tag tag--danger" title="Banni du serveur Minecraft">Banni</span><?php endif; ?><?php if ($flagged): ?> <span class="tag tag--danger">Révocation demandée</span><?php endif; ?></td>
             <td class="hide-md muted"><?= h(fmt_date($a['decided_at'] ?: $a['created_at'])) ?></td>
@@ -291,6 +309,13 @@ require APP_ROOT . '/templates/header.php';
                     <?= $menuItem($a, 'demote', 'Retirer les droits admin', 'iron_helmet', ['confirm' => "Retirer les droits admin de {$a['username']} ?"]) ?>
                   <?php elseif (!$self && $a['status'] === 'active'): ?>
                     <?= $menuItem($a, 'promote', 'Rendre admin du site', 'golden_helmet', ['confirm' => "Rendre {$a['username']} admin du site ? Il pourra valider les demandes, gérer les comptes et nommer d'autres admins. Il ne devient pas opérateur du serveur Minecraft."]) ?>
+                  <?php endif; ?>
+                  <?php if (Auth::isOwner() && !$self && !empty($a['is_admin'])): ?>
+                    <?php if (empty($a['can_console'])): ?>
+                      <?= $menuItem($a, 'console_on', 'Donner le terminal', 'command_block', ['confirm' => "Donner à {$a['username']} l'accès au terminal du serveur ? Il pourra envoyer n'importe quelle commande au serveur Minecraft."]) ?>
+                    <?php else: ?>
+                      <?= $menuItem($a, 'console_off', 'Retirer le terminal', 'command_block') ?>
+                    <?php endif; ?>
                   <?php endif; ?>
                   <?php if (!$self && Rcon::configured()): ?>
                     <?= $menuSep ?>

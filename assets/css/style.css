@@ -735,7 +735,24 @@ textarea.input { height: auto; min-height: 84px; padding: 10px 12px; line-height
 .menu__item--danger { color: #ff8a8d; }
 .menu__item--danger:hover, .menu__item--danger:focus-visible { background: rgba(229, 72, 77, .14); }
 .menu__sep { display: block; height: 1px; margin: 4px 8px; background: var(--border); }
-.page-head__link { margin-left: 12px; font-weight: 600; }
+.page-head--row { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.page-head__actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.page-head__actions .mc-icon { width: 18px; height: 18px; }
+
+/* Terminal du serveur */
+.console { display: flex; flex-direction: column; gap: 12px; }
+.console__out {
+  min-height: 90px; max-height: 320px; overflow-y: auto; padding: 12px 14px;
+  background: #0a0d12; border: 1px solid var(--border); border-radius: 10px;
+  font-family: var(--mono); font-size: 13px; line-height: 1.6;
+}
+.console__prompt { color: var(--accent); font-weight: 700; }
+.console__cmd { color: var(--text); }
+.console__reply { color: var(--text-2); white-space: pre-wrap; overflow-wrap: anywhere; }
+.console__reply--error { color: #ff8a8d; }
+.console__bar { display: flex; align-items: center; gap: 8px; }
+.console__input { flex: 1; font-family: var(--mono); }
+.console__past { font-family: var(--mono); font-size: 12px; }
 .event-kind { white-space: nowrap; }
 .event-kind .mc-icon { width: 18px; height: 18px; margin-right: 6px; }
 .log-detail { max-width: 520px; overflow-wrap: anywhere; }
