@@ -120,6 +120,7 @@ final class Sync
         $lookups = $cli ? 100 : 2;
         $updated = 0;
         $skipped = 0;
+        $deathSpots = [];
         $unreadable = 0;
 
         $pdo->beginTransaction();
@@ -171,6 +172,14 @@ final class Sync
                 $lookups--;
                 $nameChecked = $now;
                 $name = self::mojangName($uuid) ?? '';
+            }
+
+            // lieu de la dernière mort : sert à situer les morts lues dans le journal du serveur
+            if ($name !== '' && !empty($player['last_death']['pos'])) {
+                $deathSpots[$name] = [
+                    'dim' => (string) ($player['last_death']['dim'] ?? 'minecraft:overworld'),
+                    'pos' => $player['last_death']['pos'],
+                ];
             }
 
             $values = Stats::compute($stats, $adv['count'], $player);
@@ -266,6 +275,7 @@ final class Sync
 
         // Journal du serveur (morts, connexions, chat…)
         ServerLog::sync($log);
+        ServerLog::attachPlaces($deathSpots);
 
         // Skins : en dehors de la transaction (requêtes réseau)
         $skins = self::updateSkins($cli, $now);

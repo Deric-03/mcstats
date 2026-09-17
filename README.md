@@ -492,6 +492,11 @@ Trois parties :
    « le joueur » quand c'est lui qui a agi) et le motif saisi.
 2. **Sur le serveur** : morts, connexions, déconnexions, chat, commandes et succès, lus dans le journal du
    serveur Minecraft (voir ci-dessous). Un champ filtre la liste.
+   Chaque mort est détaillée : **cause** (chute, lave, noyade, explosion, foudre, gel, faim…), **auteur**
+   (le mob avec son icône, ou le joueur avec sa tête et un lien vers son profil) et **lieu** — coordonnées,
+   dimension et lien vers la carte. Le message brut du serveur est gardé en dessous.
+   Le lieu vient du fichier du joueur (`LastDeathLocation`) : il apparaît à la synchronisation qui suit la
+   mort, et manque si le fichier n'a pas encore été écrit par le serveur.
 3. **Périodes de connexion** : début, fin et durée de chaque passage sur le serveur, plus le total des
    7 derniers jours. Elles sont construites par la synchronisation, sans lire les logs.
 

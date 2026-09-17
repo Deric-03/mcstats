@@ -739,6 +739,11 @@ textarea.input { height: auto; min-height: 84px; padding: 10px 12px; line-height
 .event-kind { white-space: nowrap; }
 .event-kind .mc-icon { width: 18px; height: 18px; margin-right: 6px; }
 .log-detail { max-width: 520px; overflow-wrap: anywhere; }
+.death { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.death .mc-icon { width: 18px; height: 18px; }
+.death__by { display: inline-flex; align-items: center; gap: 4px; color: var(--text-2); }
+.death__place { font-family: var(--mono); font-size: 12px; }
+.death__raw { display: block; font-size: 12px; }
 .accounts-table tr.is-flagged td { background: rgba(229, 72, 77, .06); }
 .flag {
   display: flex; flex-direction: column; gap: 2px; margin-top: 8px; padding: 8px 10px;

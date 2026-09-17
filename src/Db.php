@@ -4,7 +4,7 @@
  */
 final class Db
 {
-    const SCHEMA_VERSION = 6;
+    const SCHEMA_VERSION = 7;
 
     /** Colonnes ajoutées après la première version (ajoutées automatiquement si absentes). */
     const EXTRA_COLUMNS = [
@@ -213,8 +213,23 @@ final class Db
             kind VARCHAR(16) NOT NULL DEFAULT '',
             player VARCHAR(40) NOT NULL DEFAULT '',
             player_lc VARCHAR(40) NOT NULL DEFAULT '',
-            message VARCHAR(500) NOT NULL DEFAULT ''
+            message VARCHAR(500) NOT NULL DEFAULT '',
+            cause VARCHAR(32) NOT NULL DEFAULT '',
+            killer VARCHAR(60) NOT NULL DEFAULT '',
+            dim VARCHAR(48) NOT NULL DEFAULT '',
+            x INT NOT NULL DEFAULT 0,
+            y INT NOT NULL DEFAULT 0,
+            z INT NOT NULL DEFAULT 0
         )" . $suffix);
+        // colonnes ajoutées après coup (bases créées par une version précédente)
+        self::addColumns($pdo, 'server_events', [
+            'cause'  => "VARCHAR(32) NOT NULL DEFAULT ''",
+            'killer' => "VARCHAR(60) NOT NULL DEFAULT ''",
+            'dim'    => "VARCHAR(48) NOT NULL DEFAULT ''",
+            'x'      => 'INT NOT NULL DEFAULT 0',
+            'y'      => 'INT NOT NULL DEFAULT 0',
+            'z'      => 'INT NOT NULL DEFAULT 0',
+        ]);
         foreach (['CREATE INDEX IF NOT EXISTS idx_events_player ON server_events (player_lc, at)',
                   'CREATE INDEX IF NOT EXISTS idx_events_at ON server_events (at)',
                   'CREATE INDEX IF NOT EXISTS idx_log_account ON admin_log (account_id)'] as $sql) {
@@ -235,16 +250,7 @@ final class Db
         )' . $suffix);
 
         // Colonnes de catégories (une par statistique classée)
-        $existing = [];
-        if (self::driver() === 'sqlite') {
-            foreach ($pdo->query('PRAGMA table_info(players)')->fetchAll() as $col) {
-                $existing[strtolower($col['name'])] = true;
-            }
-        } else {
-            foreach ($pdo->query('SHOW COLUMNS FROM players')->fetchAll() as $col) {
-                $existing[strtolower($col['Field'])] = true;
-            }
-        }
+        $existing = self::columnsOf($pdo, 'players');
         foreach (Stats::CATEGORIES as $key => $cat) {
             if (!isset($existing[$key])) {
                 $type = ($cat['type'] ?? 'int') === 'float' ? 'DOUBLE' : 'BIGINT';
@@ -259,6 +265,33 @@ final class Db
 
         $pdo->exec("REPLACE INTO meta (k, v) VALUES ('schema', '" . self::SCHEMA_VERSION . "')");
         $pdo->exec("REPLACE INTO meta (k, v) VALUES ('columns', '" . self::columnsSignature() . "')");
+    }
+
+    /** Colonnes existantes d'une table : nom en minuscules => true. */
+    private static function columnsOf(PDO $pdo, string $table): array
+    {
+        $out = [];
+        if (self::driver() === 'sqlite') {
+            foreach ($pdo->query("PRAGMA table_info($table)")->fetchAll() as $col) {
+                $out[strtolower($col['name'])] = true;
+            }
+        } else {
+            foreach ($pdo->query("SHOW COLUMNS FROM $table")->fetchAll() as $col) {
+                $out[strtolower($col['Field'])] = true;
+            }
+        }
+        return $out;
+    }
+
+    /** Ajoute les colonnes manquantes d'une table. */
+    private static function addColumns(PDO $pdo, string $table, array $columns): void
+    {
+        $existing = self::columnsOf($pdo, $table);
+        foreach ($columns as $name => $def) {
+            if (!isset($existing[$name])) {
+                $pdo->exec("ALTER TABLE $table ADD COLUMN $name $def");
+            }
+        }
     }
 
     private static function columnsSignature(): string

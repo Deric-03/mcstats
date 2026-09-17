@@ -23,6 +23,40 @@ $events = ServerLog::enabled() ? ($account ? ServerLog::forPlayer($name) : Serve
 $sessions = $account && $player ? Journal::sessions($player['uuid'], 40) : [];
 $week = $sessions ? Journal::timeSince($sessions, time() - 7 * 86400) : 0;
 $logStatus = ServerLog::status();
+$mapWorlds = MapData::enabled() ? MapData::worlds() : [];
+$knownPlayers = [];
+foreach (Db::all('SELECT uuid, name FROM players WHERE name <> \'\'') as $p) {
+    $knownPlayers[mb_strtolower($p['name'])] = $p;
+}
+
+/** Détail d'un événement : mort (cause, auteur, lieu) ou simple message. */
+$eventDetail = function (array $e) use ($mapWorlds, $knownPlayers) {
+    if ($e['kind'] !== 'death') {
+        return h($e['message']);
+    }
+    $html = '<span class="death">' . mc_icon(ServerLog::causeIcon($e['cause']))
+        . '<strong>' . h(ServerLog::causeLabel($e['cause'])) . '</strong>';
+    if ($e['killer'] !== '') {
+        $lc = mb_strtolower($e['killer']);
+        $id = str_replace(' ', '_', $lc);
+        if (isset($knownPlayers[$lc])) {
+            $who = head_img($knownPlayers[$lc]['uuid'], 18) . '<a class="link-more" href="' . h(player_url($knownPlayers[$lc])) . '">' . h($knownPlayers[$lc]['name']) . '</a>';
+        } elseif (Mc::iconUrl(Mc::entityIconId($id)) !== null) {
+            $who = entity_icon($id) . h(Mc::entityName($id));
+        } else {
+            $who = h($e['killer']);
+        }
+        $html .= '<span class="death__by">par ' . $who . '</span>';
+    }
+    if ($e['dim'] !== '') {
+        $place = h(coords([$e['x'], $e['y'], $e['z']])) . ' <span class="muted">(' . h(Mc::dimensionName($e['dim'])) . ')</span>';
+        $world = $mapWorlds ? MapData::worldFor($e['dim'], $mapWorlds) : null;
+        $html .= '<span class="death__place">' . ($world
+            ? '<a class="link-more" href="carte.php?' . h(http_build_query(['w' => $world, 'x' => (int) $e['x'], 'z' => (int) $e['z']])) . '" title="Voir sur la carte">' . $place . '</a>'
+            : $place) . '</span>';
+    }
+    return $html . '</span><span class="death__raw muted">' . h($e['message']) . '</span>';
+};
 
 $pageTitle = $account ? 'Journal de ' . $name : 'Journal du site';
 $nav = 'admin';
@@ -74,11 +108,11 @@ require APP_ROOT . '/templates/header.php';
         <thead><tr><th>Quand</th><?php if (!$account): ?><th>Joueur</th><?php endif; ?><th>Type</th><th>Message</th></tr></thead>
         <tbody>
         <?php foreach ($events as $e): ?>
-          <tr data-filter-text="<?= h(mb_strtolower(ServerLog::label($e['kind']) . ' ' . $e['player'] . ' ' . $e['message'])) ?>">
+          <tr data-filter-text="<?= h(mb_strtolower(ServerLog::label($e['kind']) . ' ' . $e['player'] . ' ' . $e['message'] . ' ' . ServerLog::causeLabel((string) $e['cause']) . ' ' . $e['killer'])) ?>">
             <td class="muted" title="<?= h(fmt_datetime($e['at'])) ?>"><?= h(fmt_ago($e['at'])) ?></td>
             <?php if (!$account): ?><td><?= h($e['player']) ?></td><?php endif; ?>
             <td class="event-kind"><?= mc_icon(ServerLog::icon($e['kind'])) ?><span><?= h(ServerLog::label($e['kind'])) ?></span></td>
-            <td class="log-detail"><?= h($e['message']) ?></td>
+            <td class="log-detail"><?= $eventDetail($e) ?></td>
           </tr>
         <?php endforeach; ?>
         </tbody>

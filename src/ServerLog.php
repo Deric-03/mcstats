@@ -18,6 +18,30 @@ final class ServerLog
         'advancement' => ['Succès', 'knowledge_book'],
     ];
 
+    /**
+     * Causes de mort reconnues dans le message du serveur : clé => [libellé, icône].
+     * L'ordre compte : la première expression qui correspond gagne.
+     */
+    const CAUSES = [
+        'void'       => ['Tombé dans le vide', 'end_stone', '/out of the world/i'],
+        'fall'       => ['Chute', 'feather', '/(fell |hit the ground too hard|doomed to fall)/i'],
+        'lava'       => ['Lave', 'lava_bucket', '/(lava|floor was lava)/i'],
+        'fire'       => ['Brûlé', 'flint_and_steel', '/(burn(ed|t)|went up in flames|in flames|fire)/i'],
+        'drown'      => ['Noyade', 'water_bucket', '/drown/i'],
+        'suffocate'  => ['Étouffement', 'sand', '/(suffocated|squished|squashed)/i'],
+        'starve'     => ['Faim', 'rotten_flesh', '/starved/i'],
+        'freeze'     => ['Gel', 'ice', '/(froze|frozen)/i'],
+        'lightning'  => ['Foudre', 'lightning_rod', '/struck by lightning/i'],
+        'wither'     => ['Flétrissement', 'wither_rose', '/withered away/i'],
+        'sting'      => ['Piqûre', 'sweet_berries', '/(stung|poked|pricked)/i'],
+        'explosion'  => ['Explosion', 'tnt', '/(blown up|explosion|intentional game design)/i'],
+        'projectile' => ['Touché à distance', 'arrow', '/(was shot|fireballed|pummeled|impaled|skewered)/i'],
+        'magic'      => ['Magie', 'splash_potion', '/magic/i'],
+        'kinetic'    => ['Impact', 'elytra', '/kinetic energy/i'],
+        'mob'        => ['Tué', 'iron_sword', '/(slain|killed|died)/i'],
+        'other'      => ['Mort', 'bone', '//'],
+    ];
+
     /** Quantité maximale lue en une passe (le reste sera lu à la synchronisation suivante). */
     const MAX_BYTES = 4194304;
 
@@ -39,6 +63,38 @@ final class ServerLog
     public static function icon(string $kind): string
     {
         return self::KINDS[$kind][1] ?? 'paper';
+    }
+
+    public static function causeLabel(string $cause): string
+    {
+        return self::CAUSES[$cause][0] ?? self::CAUSES['other'][0];
+    }
+
+    public static function causeIcon(string $cause): string
+    {
+        return self::CAUSES[$cause][1] ?? self::CAUSES['other'][1];
+    }
+
+    /**
+     * Cause et auteur d'une mort, d'après le message du serveur.
+     * « Quentin56000 was slain by Zombie using [Netherite Sword] » → ['mob', 'Zombie'].
+     */
+    public static function deathInfo(string $message): array
+    {
+        $killer = '';
+        if (preg_match('/\b(?:by|whilst fighting|trying to hurt|due to|escape) (?:an? )?(.+?)(?: using \[.+\])?\s*$/i', $message, $m)) {
+            $killer = trim($m[1], " .\t");
+        }
+        // « struck by lightning », « killed by magic » : ce n'est pas un tueur
+        if (preg_match('/^(lightning|magic|fire|lava|the world|water)$/i', $killer)) {
+            $killer = '';
+        }
+        foreach (self::CAUSES as $key => [, , $re]) {
+            if ($re !== '//' && preg_match($re, $message)) {
+                return ['cause' => $key, 'killer' => mb_substr($killer, 0, 60)];
+            }
+        }
+        return ['cause' => $killer !== '' ? 'mob' : 'other', 'killer' => mb_substr($killer, 0, 60)];
     }
 
     /** État de la dernière lecture (espace admin). */
@@ -171,7 +227,8 @@ final class ServerLog
     private static function classify(string $body, array $known): ?array
     {
         $make = function (string $kind, string $player, string $message) {
-            return ['kind' => $kind, 'player' => mb_substr($player, 0, 40), 'message' => mb_substr($message, 0, 500)];
+            $e = ['kind' => $kind, 'player' => mb_substr($player, 0, 40), 'message' => mb_substr($message, 0, 500)];
+            return $kind === 'death' ? $e + self::deathInfo($message) : $e;
         };
         if (preg_match('/^<([^>]{1,40})>\s?(.*)$/u', $body, $m)) {
             return App::cfg('server_log.chat', true) ? $make('chat', $m[1], $m[2]) : null;
@@ -204,13 +261,16 @@ final class ServerLog
             return 0;
         }
         $pdo = Db::pdo();
-        $stmt = $pdo->prepare('INSERT INTO server_events (sig, at, kind, player, player_lc, message) VALUES (?, ?, ?, ?, ?, ?)');
+        $stmt = $pdo->prepare('INSERT INTO server_events (sig, at, kind, player, player_lc, message, cause, killer) VALUES (?, ?, ?, ?, ?, ?, ?, ?)');
         $added = 0;
         $pdo->beginTransaction();
         foreach ($events as $e) {
             $sig = md5($e['at'] . '|' . $e['kind'] . '|' . mb_strtolower($e['player']) . '|' . $e['message']);
             try {
-                $stmt->execute([$sig, $e['at'], $e['kind'], $e['player'], mb_strtolower($e['player']), $e['message']]);
+                $stmt->execute([
+                    $sig, $e['at'], $e['kind'], $e['player'], mb_strtolower($e['player']), $e['message'],
+                    (string) ($e['cause'] ?? ''), (string) ($e['killer'] ?? ''),
+                ]);
                 $added++;
             } catch (PDOException $x) {
                 // déjà enregistré
@@ -218,6 +278,37 @@ final class ServerLog
         }
         $pdo->commit();
         return $added;
+    }
+
+    /**
+     * Complète les morts récentes avec le lieu lu dans le fichier joueur (LastDeathLocation).
+     * $spots : pseudo => ['dim' => 'minecraft:the_nether', 'pos' => [x, y, z]].
+     */
+    public static function attachPlaces(array $spots): int
+    {
+        if (!$spots || !self::enabled()) {
+            return 0;
+        }
+        $done = 0;
+        foreach ($spots as $name => $spot) {
+            if (empty($spot['pos']) || count($spot['pos']) < 3) {
+                continue;
+            }
+            $row = Db::one(
+                "SELECT id FROM server_events WHERE player_lc = ? AND kind = 'death' AND dim = '' AND at > ?
+                 ORDER BY at DESC LIMIT 1",
+                [mb_strtolower((string) $name), time() - 86400]
+            );
+            if (!$row) {
+                continue;
+            }
+            Db::exec(
+                'UPDATE server_events SET dim = ?, x = ?, y = ?, z = ? WHERE id = ?',
+                [(string) ($spot['dim'] ?? 'minecraft:overworld'), (int) $spot['pos'][0], (int) $spot['pos'][1], (int) $spot['pos'][2], $row['id']]
+            );
+            $done++;
+        }
+        return $done;
     }
 
     private static function cleanup(): void
