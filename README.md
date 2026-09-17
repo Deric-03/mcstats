@@ -309,6 +309,7 @@ Sur la carte :
 | Pseudos affichés comme des UUID | Serveur non Paper/Spigot : renseigner `usercache_path`, ou laisser `mojang_lookup` activé (mode online). |
 | Statut « hors ligne » alors que le serveur tourne | Vérifier `server.host` / `server.port` et `enable-status=true`. |
 | Graphiques vides | Normal les premiers jours : l'historique se construit jour après jour. |
+| Ancien skin affiché après un changement | Le skin est revérifié auprès de Mojang à la connexion du joueur, puis toutes les 10 min tant qu'il est en ligne (toutes les 6 h sinon). Il faut `mojang_lookup` à `true` (valeur par défaut). |
 | « La carte n'est pas encore disponible » | Vérifier `'map' => ['enabled' => true]` dans `config.php`, et que Pl3xMap a bien créé `map/tiles/settings.json` (étape 11). |
 | Carte grise ou trouée | Le rendu n'est pas terminé (`map status` dans la console), ou Apache ne peut pas lire les images : vérifier avec `ls -l /var/www/html/mcstats/map/tiles`. |
 

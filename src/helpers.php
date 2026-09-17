@@ -166,14 +166,35 @@ function roman(int $n): string
     return ['', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X'][$n];
 }
 
+/**
+ * Identifiant à donner au service de skins : l'identifiant de texture du skin actuel s'il est connu,
+ * sinon l'UUID. Avec l'identifiant de texture, un changement de skin change l'adresse de l'image :
+ * les caches (6 h chez mc-heads.net) ne peuvent plus afficher l'ancien skin.
+ */
+function skin_id(string $uuid): string
+{
+    static $skins = null;
+    if ($skins === null) {
+        $skins = [];
+        try {
+            foreach (Db::all("SELECT uuid, skin FROM players WHERE skin <> ''") as $r) {
+                $skins[$r['uuid']] = $r['skin'];
+            }
+        } catch (Throwable $e) {
+            // base indisponible : on garde l'UUID
+        }
+    }
+    return $skins[strtolower($uuid)] ?? $uuid;
+}
+
 function head_url(string $uuid, int $size = 64): string
 {
-    return rtrim((string) App::cfg('skin_url'), '/') . '/avatar/' . rawurlencode($uuid) . '/' . $size;
+    return rtrim((string) App::cfg('skin_url'), '/') . '/avatar/' . rawurlencode(skin_id($uuid)) . '/' . $size;
 }
 
 function body_url(string $uuid, int $size = 300): string
 {
-    return rtrim((string) App::cfg('skin_url'), '/') . '/body/' . rawurlencode($uuid) . '/' . $size;
+    return rtrim((string) App::cfg('skin_url'), '/') . '/body/' . rawurlencode(skin_id($uuid)) . '/' . $size;
 }
 
 function player_url(array $p): string

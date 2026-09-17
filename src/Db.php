@@ -14,6 +14,8 @@ final class Db
         'pos_x'        => 'INT NOT NULL DEFAULT 0',
         'pos_y'        => 'INT NOT NULL DEFAULT 0',
         'pos_z'        => 'INT NOT NULL DEFAULT 0',
+        'skin'         => "VARCHAR(64) NOT NULL DEFAULT ''",
+        'skin_checked' => 'BIGINT NOT NULL DEFAULT 0',
     ];
 
     private static $pdo;

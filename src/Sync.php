@@ -92,7 +92,7 @@ final class Sync
 
         $pdo = Db::pdo();
         $existing = [];
-        foreach (Db::all('SELECT uuid, name, name_checked, first_seen, last_seen, online, online_since, mtime_stats, mtime_adv, mtime_dat FROM players') as $r) {
+        foreach (Db::all('SELECT uuid, name, name_checked, first_seen, last_seen, online, online_since, skin, skin_checked, mtime_stats, mtime_adv, mtime_dat FROM players') as $r) {
             $existing[$r['uuid']] = $r;
         }
 
@@ -110,7 +110,7 @@ final class Sync
 
         $catCols = array_keys(Stats::CATEGORIES);
         $cols = array_merge(
-            ['uuid', 'name', 'hidden', 'first_seen', 'last_seen', 'gamemode', 'online', 'online_since', 'stats_json', 'adv_json', 'nbt_json', 'mtime_stats', 'mtime_adv', 'mtime_dat', 'name_checked', 'updated_at', 'pos_dim', 'pos_x', 'pos_y', 'pos_z'],
+            ['uuid', 'name', 'hidden', 'first_seen', 'last_seen', 'gamemode', 'online', 'online_since', 'stats_json', 'adv_json', 'nbt_json', 'mtime_stats', 'mtime_adv', 'mtime_dat', 'name_checked', 'updated_at', 'pos_dim', 'pos_x', 'pos_y', 'pos_z', 'skin', 'skin_checked'],
             $catCols
         );
         $insert = $pdo->prepare('REPLACE INTO players (' . implode(', ', $cols) . ') VALUES (' . implode(', ', array_fill(0, count($cols), '?')) . ')');
@@ -208,6 +208,8 @@ final class Sync
                 (int) ($player['pos'][0] ?? 0),
                 (int) ($player['pos'][1] ?? 0),
                 (int) ($player['pos'][2] ?? 0),
+                (string) ($old['skin'] ?? ''),
+                (int) ($old['skin_checked'] ?? 0),
             ];
             foreach ($catCols as $c) {
                 $row[] = $values[$c] ?? 0;
@@ -259,12 +261,16 @@ final class Sync
         Db::exec('DELETE FROM player_history WHERE day < ?', [date('Y-m-d', $now - 400 * 86400)]);
         $pdo->commit();
 
+        // Skins : en dehors de la transaction (requêtes réseau)
+        $skins = self::updateSkins($cli, $now);
+
         $info = [
             'players'  => count($files),
             'updated'  => $updated,
             'skipped'  => $skipped,
             'removed'  => $removed,
             'online'   => $online,
+            'skins'    => $skins,
             'duration' => round((microtime(true) - $t0) * 1000),
             'mode'     => $cli ? 'cron' : 'web',
         ];
@@ -294,7 +300,8 @@ final class Sync
             }
         }
         foreach ($ids as $id) {
-            Db::exec('UPDATE players SET online = 1, online_since = ? WHERE uuid = ? AND online = 0', [$now, $id]);
+            // à la connexion, le skin est revérifié (le joueur a pu en changer)
+            Db::exec('UPDATE players SET online = 1, online_since = ?, skin_checked = 0 WHERE uuid = ? AND online = 0', [$now, $id]);
         }
         if (count($ids) >= (int) ($status['players']['online'] ?? 0)) {
             if ($ids) {
@@ -612,6 +619,55 @@ final class Sync
             }
         }
         return $out;
+    }
+
+    /**
+     * Identifiant de texture du skin de chaque joueur, pour demander les rendus à mc-heads.net par
+     * cet identifiant : un nouveau skin change l'adresse de l'image, aucun cache ne montre l'ancien.
+     * Vérifié à la connexion, toutes les 10 min pour les joueurs connectés, toutes les 6 h sinon.
+     */
+    private static function updateSkins(bool $cli, int $now): int
+    {
+        if (!App::cfg('mojang_lookup', true)) {
+            return 0;
+        }
+        $limit = $cli ? 10 : 1;
+        $done = 0;
+        foreach (Db::all('SELECT uuid, online, skin_checked FROM players ORDER BY online DESC, skin_checked ASC') as $r) {
+            if ($done >= $limit) {
+                break;
+            }
+            $interval = $r['online'] ? 600 : 21600;
+            if ($now - (int) $r['skin_checked'] < $interval) {
+                continue;
+            }
+            $done++;
+            $skin = self::mojangSkin($r['uuid']);
+            if ($skin === null) {
+                // Mojang injoignable : nouvel essai dans 10 minutes
+                Db::exec('UPDATE players SET skin_checked = ? WHERE uuid = ?', [$now - $interval + 600, $r['uuid']]);
+            } else {
+                Db::exec('UPDATE players SET skin = ?, skin_checked = ? WHERE uuid = ?', [$skin, $now, $r['uuid']]);
+            }
+        }
+        return $done;
+    }
+
+    /** Identifiant de texture du skin ('' = skin par défaut ou compte hors ligne), null si Mojang ne répond pas. */
+    private static function mojangSkin(string $uuid): ?string
+    {
+        $body = http_get('https://sessionserver.mojang.com/session/minecraft/profile/' . str_replace('-', '', $uuid), 4);
+        if ($body === null) {
+            return null;
+        }
+        foreach ((array) (json_decode($body, true)['properties'] ?? []) as $prop) {
+            if (($prop['name'] ?? '') === 'textures') {
+                $t = json_decode((string) base64_decode((string) ($prop['value'] ?? '')), true);
+                $url = (string) ($t['textures']['SKIN']['url'] ?? '');
+                return preg_match('#/texture/([0-9a-f]{32,64})$#', $url, $m) ? $m[1] : '';
+            }
+        }
+        return '';
     }
 
     private static function mojangName(string $uuid): ?string
