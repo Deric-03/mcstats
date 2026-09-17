@@ -39,6 +39,51 @@ final class Plugins
         return is_array($d) ? $d : null;
     }
 
+    /** Homes d'un joueur, prêts pour la carte : [['name','player','uuid','world','x','y','z'], …] */
+    public static function homesOf(string $uuid, string $player = ''): array
+    {
+        $out = [];
+        foreach ((array) (self::data('homes', $uuid)['homes'] ?? []) as $h) {
+            $out[] = [
+                'name'   => (string) ($h['name'] ?? ''),
+                'player' => $player,
+                'uuid'   => $uuid,
+                'world'  => (string) ($h['world'] ?? ''),
+                'x'      => (int) ($h['pos'][0] ?? 0),
+                'y'      => (int) ($h['pos'][1] ?? 0),
+                'z'      => (int) ($h['pos'][2] ?? 0),
+            ];
+        }
+        return $out;
+    }
+
+    /** Homes de tous les joueurs (réservé aux admins), joueurs masqués exclus. */
+    public static function allHomes(): array
+    {
+        $names = [];
+        foreach (Db::all('SELECT uuid, name FROM players WHERE hidden = 0') as $p) {
+            $names[$p['uuid']] = $p['name'] !== '' ? $p['name'] : substr($p['uuid'], 0, 8);
+        }
+        $out = [];
+        foreach (Db::all("SELECT uuid FROM plugin_data WHERE plugin = 'homes'") as $r) {
+            if (isset($names[$r['uuid']])) {
+                $out = array_merge($out, self::homesOf($r['uuid'], $names[$r['uuid']]));
+            }
+        }
+        return $out;
+    }
+
+    /** Le joueur correspondant au compte connecté, ou null. */
+    public static function ownPlayer(): ?array
+    {
+        $u = Auth::user();
+        if (!$u) {
+            return null;
+        }
+        $p = $u['uuid'] !== '' ? Repo::findPlayer($u['uuid']) : null;
+        return $p ?: Repo::findPlayer($u['username']);
+    }
+
     /** État de la dernière lecture de chaque plugin (pour l'espace admin). */
     public static function status(): array
     {

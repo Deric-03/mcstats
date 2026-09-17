@@ -25,6 +25,12 @@
   var markers = {};
   var showOffline = !!cfg.showOffline;
   var filter = '';
+  var homesCfg = cfg.homes || null;
+  var homesMode = 'off';      // off | mine | player | all
+  var homesData = [];
+  var homesMarkers = [];
+  var playerHomesLabel = '';
+  var playerHomes = [];
   var list = $('[data-map-list]');
   var count = $('[data-map-count]');
   var coordsBox = $('[data-map-coords]');
@@ -136,7 +142,85 @@
     Object.keys(markers).forEach(function (k) { map.removeLayer(markers[k].m); });
     markers = {};
     refresh();
+    renderHomes();
   }
+
+  // ----------------------------------------------------------------- Homes
+  function homeIcon(h) {
+    return L.divIcon({
+      className: 'map-home' + (homesMode === 'all' ? '' : ' is-named'),
+      html: '<span class="map-home__icon" style="background-image:url(\'' + esc(homesCfg.icon) + '\')"></span>' +
+        '<span class="map-home__name">' + esc(h.name) + '</span>',
+      iconSize: [22, 22],
+      iconAnchor: [11, 11],
+      popupAnchor: [0, -12]
+    });
+  }
+
+  function homePopup(h) {
+    return '<div class="map-pop map-pop--home"><span class="map-home__icon" style="background-image:url(\'' + esc(homesCfg.icon) + '\')"></span>' +
+      '<div><strong>' + esc(h.name) + '</strong>' +
+      (homesMode === 'mine' ? '' : '<span class="muted">' + esc(h.player) + '</span>') +
+      '<span class="muted map-pop__xyz">X ' + h.x + ' · Y ' + h.y + ' · Z ' + h.z + '</span></div></div>';
+  }
+
+  function renderHomes() {
+    homesMarkers.forEach(function (m) { map.removeLayer(m); });
+    homesMarkers = [];
+    if (!homesCfg || homesMode === 'off' || !current) return;
+    homesData.forEach(function (h) {
+      if (h.world !== current.name) return;
+      var m = L.marker(toLatLng(h.x + 0.5, h.z + 0.5), { icon: homeIcon(h), title: h.name, riseOnHover: true, zIndexOffset: 500 });
+      m.bindPopup(homePopup(h), { className: 'map-popup', minWidth: 160, maxWidth: 260 });
+      m.addTo(map);
+      homesMarkers.push(m);
+    });
+  }
+
+  function homeChip(mode) { return $('[data-homes="' + mode + '"]'); }
+
+  function setHomes(mode, data, label) {
+    homesMode = mode;
+    homesData = mode === 'off' ? [] : (data || []);
+    if (mode === 'player') playerHomes = homesData;
+    var chip = homeChip('player');
+    if (chip) {
+      if (mode === 'player') playerHomesLabel = label || playerHomesLabel;
+      chip.hidden = !playerHomesLabel;
+      if (playerHomesLabel) chip.innerHTML = '<span class="mc-icon" style="background-image:url(\'' + esc(homesCfg.icon) + '\')"></span>' + esc(playerHomesLabel);
+    }
+    $$('[data-homes]').forEach(function (b) {
+      b.classList.toggle('is-active', b.getAttribute('data-homes') === mode);
+    });
+    renderHomes();
+  }
+
+  function loadHomes(query, mode) {
+    fetch(homesCfg.api + query, { cache: 'no-store' })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (d) {
+        if (d && Array.isArray(d.homes)) setHomes(mode, d.homes, d.label);
+      })
+      .catch(function () {});
+  }
+
+  // Admin : cliquer un joueur affiche ses homes
+  function showHomesOf(p) {
+    if (!homesCfg || !homesCfg.admin || !p) return;
+    loadHomes('?p=' + encodeURIComponent(p.uuid), 'player');
+  }
+
+  if (homesCfg && homesCfg.mine && homesCfg.mine.length) setHomes('mine', homesCfg.mine);
+
+  $$('[data-homes]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      var mode = b.getAttribute('data-homes');
+      if (homesMode === mode) { setHomes('off'); return; }
+      if (mode === 'mine') setHomes('mine', homesCfg.mine);
+      else if (mode === 'all') loadHomes('?all=1', 'all');
+      else if (playerHomesLabel) setHomes('player', playerHomes, playerHomesLabel);
+    });
+  });
 
   function visible(p) {
     return p.online || showOffline;
@@ -226,6 +310,7 @@
 
   function focusPlayer(p) {
     if (!p || !visible(p)) return;
+    showHomesOf(p);
     var w = byName[p.world];
     if (!w) return;
     var zoom = current === w ? Math.max(map.getZoom(), w.maxOut) : w.maxOut;

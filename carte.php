@@ -14,6 +14,16 @@ $enabled = MapData::enabled();
 $worlds = $enabled ? MapData::worlds() : [];
 $players = $worlds ? MapData::players($worlds) : [];
 
+// Homes sur la carte : les siens pour un joueur connecté, ceux de n'importe qui pour un admin
+$homesOn = $worlds && Plugins::enabled('homes') && Auth::enabled() && Auth::user() !== null;
+$myPlayer = $homesOn ? Plugins::ownPlayer() : null;
+$myHomes = $myPlayer ? Plugins::homesOf($myPlayer['uuid'], display_name($myPlayer)) : [];
+$homesAdmin = $homesOn && Auth::isAdmin();
+// Icône des homes : le lit dessiné pour le site, ou l'objet Minecraft indiqué dans la config
+$homeIconCfg = trim((string) App::cfg('map.home_icon', ''));
+$homeIcon = ($homeIconCfg !== '' ? Mc::iconUrl($homeIconCfg) : null) ?: asset_url('assets/img/home.svg');
+$homeChipIcon = mc_icon_url($homeIcon);
+
 $pageTitle = 'Carte';
 $nav = 'map';
 $mainClass = 'main main--map';
@@ -42,7 +52,13 @@ if (!$worlds): ?>
         'showCoords'  => (bool) App::cfg('show_position', true),
         'showOffline' => MapData::showOffline(),
         'centerOnPlayers' => (bool) App::cfg('map.center_on_players', true),
-        'spawnIcon'   => Mc::iconUrl('red_bed'),
+        'spawnIcon'   => Mc::iconUrl((string) App::cfg('map.spawn_icon', 'compass')),
+        'homes'       => $homesOn ? [
+            'admin' => $homesAdmin,
+            'api'   => 'api/homes.php',
+            'icon'  => $homeIcon,
+            'mine'  => $myHomes,
+        ] : null,
         'focus'       => [
             'p' => (string) ($_GET['p'] ?? ''),
             'w' => (string) ($_GET['w'] ?? ''),
@@ -62,6 +78,13 @@ if (!$worlds): ?>
         <button type="button" class="chip" role="tab" data-map-world="<?= h($w['name']) ?>"><?= mc_icon(['overworld' => 'grass_block', 'nether' => 'netherrack', 'end' => 'end_stone'][$w['type']]) ?><?= h($w['label']) ?></button>
       <?php endforeach; ?>
     </div>
+    <?php if ($homesOn && ($myHomes || $homesAdmin)): ?>
+    <div class="chips map-homes" aria-label="Homes">
+      <?php if ($myHomes): ?><button type="button" class="chip" data-homes="mine"><?= $homeChipIcon ?>Mes homes</button><?php endif; ?>
+      <?php if ($homesAdmin): ?><button type="button" class="chip" data-homes="all"><?= $homeChipIcon ?>Tous les homes</button><?php endif; ?>
+      <?php if ($homesAdmin): ?><button type="button" class="chip" data-homes="player" hidden></button><?php endif; ?>
+    </div>
+    <?php endif; ?>
     <input class="input" type="search" placeholder="Chercher un joueur…" autocomplete="off" aria-label="Chercher un joueur sur la carte" data-map-search>
     <?php if (MapData::showOffline()): ?>
       <label class="map-toggle"><input type="checkbox" data-map-offline checked> Afficher les joueurs hors ligne</label>

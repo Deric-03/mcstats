@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="16" height="16" shape-rendering="crispEdges" role="img" aria-label="Home">
+  <!-- Lit dessiné pixel par pixel, dans l'esprit des textures Minecraft (16 × 16). -->
+  <!-- Contour -->
+  <rect x="1" y="2" width="14" height="1" fill="#2b1b10"/>
+  <rect x="1" y="3" width="1" height="4" fill="#2b1b10"/>
+  <rect x="14" y="3" width="1" height="4" fill="#2b1b10"/>
+  <!-- Oreiller -->
+  <rect x="2" y="3" width="4" height="3" fill="#f0f4f5"/>
+  <rect x="2" y="6" width="4" height="1" fill="#c9d2d6"/>
+  <rect x="6" y="3" width="1" height="4" fill="#2b1b10"/>
+  <!-- Matelas -->
+  <rect x="7" y="3" width="7" height="3" fill="#b02e26"/>
+  <rect x="7" y="6" width="7" height="1" fill="#8b231c"/>
+  <!-- Cadre en bois -->
+  <rect x="1" y="7" width="14" height="1" fill="#2b1b10"/>
+  <rect x="1" y="8" width="1" height="3" fill="#2b1b10"/>
+  <rect x="14" y="8" width="1" height="3" fill="#2b1b10"/>
+  <rect x="2" y="8" width="12" height="2" fill="#b58b5a"/>
+  <rect x="2" y="10" width="12" height="1" fill="#8a6740"/>
+  <rect x="1" y="11" width="14" height="1" fill="#2b1b10"/>
+  <!-- Pieds -->
+  <rect x="2" y="12" width="2" height="1" fill="#8a6740"/>
+  <rect x="12" y="12" width="2" height="1" fill="#8a6740"/>
+  <rect x="2" y="13" width="2" height="1" fill="#2b1b10"/>
+  <rect x="12" y="13" width="2" height="1" fill="#2b1b10"/>
+</svg>

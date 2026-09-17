@@ -565,6 +565,19 @@ a.server__player:hover { background: var(--surface-3); }
 }
 .map-player.is-online .map-player__name, .map-player:hover .map-player__name { display: block; }
 .map-spawn span { display: block; width: 20px; height: 20px; background-size: 100% auto; image-rendering: pixelated; filter: drop-shadow(0 1px 2px #000); }
+.map-homes .chip { cursor: pointer; font: inherit; font-size: 13px; font-weight: 600; }
+.map-home { position: relative; }
+.map-home__icon {
+  display: block; width: 22px; height: 22px; background-size: 100% auto; background-repeat: no-repeat;
+  image-rendering: pixelated; filter: drop-shadow(0 1px 2px #000);
+}
+.map-home__name {
+  position: absolute; top: 23px; left: 50%; transform: translateX(-50%); display: none;
+  color: #fff; font-size: 12px; font-weight: 700; white-space: nowrap; text-shadow: 0 1px 2px #000, 0 0 4px #000;
+}
+.map-home.is-named .map-home__name, .map-home:hover .map-home__name { display: block; }
+.map-pop--home { align-items: flex-start; }
+.map-pop--home .map-home__icon { width: 28px; height: 28px; flex: none; }
 .leaflet-container { font: inherit; }
 .map-popup .leaflet-popup-content-wrapper, .map-popup .leaflet-popup-tip { background: var(--surface-2); color: var(--text); box-shadow: 0 10px 30px rgba(0, 0, 0, .5); }
 .map-popup .leaflet-popup-content { margin: 12px 30px 12px 14px; }

@@ -220,6 +220,12 @@ function mc_icon(?string $id, string $title = '', string $cls = ''): string
     return '<span class="mc-icon mc-icon--ph ' . h($cls) . '"' . $t . '>' . h($letter) . '</span>';
 }
 
+/** Icône à partir d'une adresse d'image (icône du site ou d'un objet Minecraft). */
+function mc_icon_url(string $url, string $cls = ''): string
+{
+    return '<span class="mc-icon ' . h($cls) . '" style="background-image:url(\'' . h($url) . '\')"></span>';
+}
+
 function entity_icon(?string $id, string $cls = ''): string
 {
     return mc_icon(Mc::entityIconId($id), '', $cls);

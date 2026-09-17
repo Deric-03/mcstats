@@ -267,8 +267,8 @@ Le détail est affiché aux visiteurs sur la page Classements (« Comment est ca
 
 ## 11. Carte (Pl3xMap)
 
-La page « Carte » affiche le vrai monde vu du dessus, avec la tête des joueurs, une recherche et le choix
-de la dimension. Les images sont produites par le plugin Paper
+La page « Carte » affiche le vrai monde vu du dessus, avec la tête des joueurs, une recherche, le choix
+de la dimension et, pour les joueurs connectés, leurs homes (étape 13). Les images sont produites par le plugin Paper
 [Pl3xMap](https://modrinth.com/plugin/pl3xmap) : il les écrit directement dans le dossier du site et son
 serveur web intégré est désactivé. C'est Apache qui les sert, aucun port supplémentaire n'est ouvert.
 
@@ -409,6 +409,15 @@ Sur le profil d'un joueur :
 - onglet **« Déplacements »** : la liste de ses homes
   ([UltimateHomes](https://www.spigotmc.org/resources/64210/) ou [EssentialsX](https://essentialsx.net)) —
   nom, dimension et coordonnées, avec un lien vers la carte quand Pl3xMap est installé.
+
+**Sur la carte**, les homes apparaissent en plus, marqués d'un lit :
+
+- un joueur connecté voit les siens dès l'ouverture de la carte ; la pastille « Mes homes », sous le choix
+  de la dimension, les masque ou les remontre ;
+- un admin a en plus la pastille « Tous les homes », et cliquer un joueur dans la liste (ou le chercher)
+  affiche les homes de ce joueur, avec une pastille « Homes de … » ;
+- les icônes se changent dans `config.php`, section `map` : `spawn_icon` pour le point d'apparition
+  (objet Minecraft, par défaut la boussole) et `home_icon` pour les homes (vide = le lit dessiné pour le site).
 
 **Qui peut les voir ?** Quand les comptes sont activés (étape 12), le coffre de l'Ender, le sac à dos et les
 homes sont **privés** : seuls le joueur, sur son propre profil (marqué du badge « Vous »), et les admins, sur

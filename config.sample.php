@@ -77,6 +77,11 @@ return [
         'refresh_seconds' => 5,                  // rafraîchissement des positions dans le navigateur
         // Au chargement, centrer la carte sur la zone où il y a le plus de joueurs (sinon : point d'apparition)
         'center_on_players' => true,
+        // Icônes de la carte. Le point d'apparition prend une icône d'objet Minecraft (compass,
+        // lodestone, respawn_anchor…). Les homes sont marqués du lit dessiné pour le site ;
+        // indiquer un objet Minecraft ici pour le remplacer.
+        'spawn_icon' => 'compass',
+        'home_icon'  => '',
     ],
 
     // ------------------------------------------------------------------
