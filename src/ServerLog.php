@@ -104,21 +104,45 @@ final class ServerLog
     }
 
     /** Événements d'un joueur, du plus récent au plus ancien. */
-    public static function forPlayer(string $name, int $limit = 200): array
+    public static function forPlayer(string $name, int $limit = 200, int $offset = 0): array
     {
         if ($name === '') {
             return [];
         }
         return Db::all(
-            'SELECT * FROM server_events WHERE player_lc = ? ORDER BY at DESC, id DESC LIMIT ' . max(1, $limit),
+            'SELECT * FROM server_events WHERE player_lc = ? ORDER BY at DESC, id DESC' . self::page($limit, $offset),
             [mb_strtolower($name)]
         );
     }
 
-    /** Derniers événements, tous joueurs confondus. */
-    public static function recent(int $limit = 100): array
+    public static function countForPlayer(string $name): int
     {
-        return Db::all('SELECT * FROM server_events ORDER BY at DESC, id DESC LIMIT ' . max(1, $limit));
+        return $name === '' ? 0 : (int) Db::value('SELECT COUNT(*) FROM server_events WHERE player_lc = ?', [mb_strtolower($name)]);
+    }
+
+    /** Derniers événements, tous joueurs confondus ; $except masque un joueur (l'admin principal). */
+    public static function recent(int $limit = 100, int $offset = 0, string $except = ''): array
+    {
+        if ($except !== '') {
+            return Db::all(
+                'SELECT * FROM server_events WHERE player_lc <> ? ORDER BY at DESC, id DESC' . self::page($limit, $offset),
+                [mb_strtolower($except)]
+            );
+        }
+        return Db::all('SELECT * FROM server_events ORDER BY at DESC, id DESC' . self::page($limit, $offset));
+    }
+
+    public static function countRecent(string $except = ''): int
+    {
+        return $except !== ''
+            ? (int) Db::value('SELECT COUNT(*) FROM server_events WHERE player_lc <> ?', [mb_strtolower($except)])
+            : (int) Db::value('SELECT COUNT(*) FROM server_events');
+    }
+
+    /** Fragment LIMIT/OFFSET (valeurs entières, jamais issues telles quelles de l'URL). */
+    private static function page(int $limit, int $offset): string
+    {
+        return ' LIMIT ' . max(1, min(1000, $limit)) . ' OFFSET ' . max(0, $offset);
     }
 
     /** Appelé par la synchronisation : lit les nouvelles lignes et range les événements. */

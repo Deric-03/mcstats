@@ -543,6 +543,13 @@ Trois parties :
 3. **Périodes de connexion** : début, fin et durée de chaque passage sur le serveur, plus le total des
    7 derniers jours. Elles sont construites par la synchronisation, sans lire les logs.
 
+Les deux premières listes sont **paginées** : 150 lignes par page par défaut, au choix 50, 150, 500 ou 1000
+(barre au-dessus de chaque liste), avec Précédent / Suivant en dessous. Le nombre total de lignes est
+toujours affiché, et les listes ne chargent jamais plus d'une page à la fois, même avec des centaines de
+milliers d'événements.
+
+Le champ de filtre de « Sur le serveur » ne filtre que la page affichée.
+
 ### Lire le journal du serveur
 
 À chaque synchronisation, le site lit les **nouvelles lignes** de `logs/latest.log` (un curseur est gardé en
@@ -559,6 +566,10 @@ et rien n'est relu deux fois.
 ```
 
 - Le journal démarre à la mise en place : il ne remonte pas dans le passé.
+- Volume : les événements du serveur sont effacés après `keep_days` (90 jours par défaut) et les actions du
+  site après `accounts.journal_keep_days` (2 ans par défaut, `0` pour tout garder). Les tables sont indexées
+  sur le joueur, la date et le type.
+- Au maximum 4 Mo de journal sont lus par passage ; s'il en reste, la suite est lue à la minute suivante.
 - Le fichier est lu par la synchronisation, donc sous le compte du serveur Minecraft (étape 5).
 - `'chat' => false` si vous préférez ne pas conserver les conversations des joueurs.
 - Les messages de mort sont gardés tels que le serveur les écrit (« … was slain by Zombie »), donc en

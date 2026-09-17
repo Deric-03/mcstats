@@ -61,18 +61,51 @@ final class Journal
     }
 
     /** Actions concernant un compte (retrouvées même après sa suppression, par le pseudo). */
-    public static function forAccount(array $account, int $limit = 200): array
+    public static function forAccount(array $account, int $limit = 200, int $offset = 0): array
     {
         return Db::all(
-            'SELECT * FROM admin_log WHERE account_id = ? OR username_lc = ? ORDER BY created_at DESC, id DESC LIMIT ' . max(1, $limit),
-            [(int) ($account['id'] ?? 0), mb_strtolower((string) ($account['username_lc'] ?? $account['username'] ?? ''))]
+            'SELECT * FROM admin_log WHERE account_id = ? OR username_lc = ? ORDER BY created_at DESC, id DESC'
+            . self::page($limit, $offset),
+            [(int) ($account['id'] ?? 0), self::key($account)]
         );
     }
 
-    /** Dernières actions, tous comptes confondus. */
-    public static function recent(int $limit = 100): array
+    public static function countForAccount(array $account): int
     {
-        return Db::all('SELECT * FROM admin_log ORDER BY created_at DESC, id DESC LIMIT ' . max(1, $limit));
+        return (int) Db::value(
+            'SELECT COUNT(*) FROM admin_log WHERE account_id = ? OR username_lc = ?',
+            [(int) ($account['id'] ?? 0), self::key($account)]
+        );
+    }
+
+    /** Dernières actions, tous comptes confondus ; $except masque un pseudo (l'admin principal). */
+    public static function recent(int $limit = 100, int $offset = 0, string $except = ''): array
+    {
+        if ($except !== '') {
+            return Db::all(
+                'SELECT * FROM admin_log WHERE username_lc <> ? ORDER BY created_at DESC, id DESC' . self::page($limit, $offset),
+                [mb_strtolower($except)]
+            );
+        }
+        return Db::all('SELECT * FROM admin_log ORDER BY created_at DESC, id DESC' . self::page($limit, $offset));
+    }
+
+    public static function countRecent(string $except = ''): int
+    {
+        return $except !== ''
+            ? (int) Db::value('SELECT COUNT(*) FROM admin_log WHERE username_lc <> ?', [mb_strtolower($except)])
+            : (int) Db::value('SELECT COUNT(*) FROM admin_log');
+    }
+
+    private static function key(array $account): string
+    {
+        return mb_strtolower((string) ($account['username_lc'] ?? $account['username'] ?? ''));
+    }
+
+    /** Fragment LIMIT/OFFSET (valeurs entières, jamais issues telles quelles de l'URL). */
+    private static function page(int $limit, int $offset): string
+    {
+        return ' LIMIT ' . max(1, min(1000, $limit)) . ' OFFSET ' . max(0, $offset);
     }
 
     /** Périodes de connexion d'un joueur, la plus récente d'abord. */
@@ -114,9 +147,13 @@ final class Journal
         Db::exec('UPDATE player_sessions SET ended_at = ? WHERE uuid = ? AND ended_at = 0', [$now, $uuid]);
     }
 
-    /** Ménage : sessions de plus de 400 jours. */
+    /** Ménage : sessions de plus de 400 jours, actions plus vieilles que journal_keep_days. */
     public static function cleanup(int $now): void
     {
         Db::exec('DELETE FROM player_sessions WHERE ended_at > 0 AND ended_at < ?', [$now - 400 * 86400]);
+        $days = (int) App::cfg('accounts.journal_keep_days', 730);
+        if ($days > 0) {
+            Db::exec('DELETE FROM admin_log WHERE created_at < ?', [$now - $days * 86400]);
+        }
     }
 }

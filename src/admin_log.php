@@ -29,20 +29,48 @@ if ($account && Auth::isProtected($account)) {
 
 $player = $account ? Repo::findPlayer($account['uuid'] !== '' ? $account['uuid'] : $account['username']) : null;
 $name = $account ? $account['username'] : '';
-$actions = $account ? Journal::forAccount($account) : Journal::recent(150);
-$events = ServerLog::enabled() ? ($account ? ServerLog::forPlayer($name) : ServerLog::recent(150)) : [];
+// Listes paginées : 150 lignes par page par défaut
+const LOG_SIZES = [50, 150, 500, 1000];
+$per = (int) ($_GET['n'] ?? 150);
+if (!in_array($per, LOG_SIZES, true)) {
+    $per = 150;
+}
+// l'admin principal est masqué du journal du site pour les autres admins
+$except = !$account && Auth::owner() && !Auth::isOwner() ? (string) Auth::owner()['username_lc'] : '';
+
+$totalActions = $account ? Journal::countForAccount($account) : Journal::countRecent($except);
+$totalEvents = !ServerLog::enabled() ? 0 : ($account ? ServerLog::countForPlayer($name) : ServerLog::countRecent($except));
+$pagesActions = max(1, (int) ceil($totalActions / $per));
+$pagesEvents = max(1, (int) ceil($totalEvents / $per));
+$pa = min($pagesActions, max(1, (int) ($_GET['pa'] ?? 1)));
+$pe = min($pagesEvents, max(1, (int) ($_GET['pe'] ?? 1)));
+
+$actions = $account
+    ? Journal::forAccount($account, $per, ($pa - 1) * $per)
+    : Journal::recent($per, ($pa - 1) * $per, $except);
+$events = !ServerLog::enabled() ? [] : ($account
+    ? ServerLog::forPlayer($name, $per, ($pe - 1) * $per)
+    : ServerLog::recent($per, ($pe - 1) * $per, $except));
+
+/** Adresse de la page, en changeant un ou plusieurs paramètres. */
+$logUrl = function (array $set = []) use ($which, $per, $pa, $pe) {
+    $q = array_merge(['log' => $which, 'n' => $per, 'pa' => $pa, 'pe' => $pe], $set);
+    return 'admin.php?' . http_build_query($q);
+};
+
+/** Barre au-dessus d'une liste : total, page, et choix du nombre de lignes. */
+$logToolbar = function (int $total, int $page, int $pages, string $key) use ($per, $logUrl) {
+    $html = '<div class="toolbar toolbar--log"><span class="muted">' . fmt_int($total) . ' ligne' . ($total > 1 ? 's' : '')
+        . ($pages > 1 ? ' · page ' . $page . ' sur ' . $pages : '') . '</span><span class="perpage">Par page :';
+    foreach (LOG_SIZES as $size) {
+        $html .= $size === $per
+            ? ' <strong class="perpage__on">' . $size . '</strong>'
+            : ' <a class="link-more" href="' . h($logUrl(['n' => $size, $key => 1])) . '">' . $size . '</a>';
+    }
+    return $html . '</span></div>';
+};
 $sessions = $account && $player ? Journal::sessions($player['uuid'], 40) : [];
 $week = $sessions ? Journal::timeSince($sessions, time() - 7 * 86400) : 0;
-// Journal du site : ce qui concerne l'admin principal est retiré pour les autres admins
-$hidden = !$account && Auth::owner() && !Auth::isOwner() ? mb_strtolower((string) Auth::owner()['username_lc']) : '';
-if ($hidden !== '') {
-    $actions = array_values(array_filter($actions, function ($r) use ($hidden) {
-        return mb_strtolower((string) $r['username_lc']) !== $hidden;
-    }));
-    $events = array_values(array_filter($events, function ($e) use ($hidden) {
-        return mb_strtolower((string) $e['player_lc']) !== $hidden;
-    }));
-}
 $logStatus = ServerLog::status();
 $mapWorlds = MapData::enabled() ? MapData::worlds() : [];
 $knownPlayers = [];
@@ -95,7 +123,8 @@ require APP_ROOT . '/templates/header.php';
   </div>
 
   <section class="stack">
-    <h2 class="h-section">Actions du site <span class="muted">(<?= count($actions) ?>)</span></h2>
+    <h2 class="h-section">Actions du site</h2>
+    <?= $logToolbar($totalActions, $pa, $pagesActions, 'pa') ?>
     <?php if (!$actions): ?>
       <div class="card empty"><p class="muted">Aucune action enregistrée.</p></div>
     <?php else: ?>
@@ -115,14 +144,18 @@ require APP_ROOT . '/templates/header.php';
         </tbody>
       </table>
     </div>
+    <?= pagination($pa, $pagesActions, function ($p) use ($logUrl) {
+        return $logUrl(['pa' => $p]);
+    }) ?>
     <?php endif; ?>
   </section>
 
   <?php if (ServerLog::enabled()): ?>
   <section class="stack">
-    <h2 class="h-section">Sur le serveur <span class="muted">(<?= count($events) ?>)</span></h2>
+    <h2 class="h-section">Sur le serveur</h2>
+    <?= $logToolbar($totalEvents, $pe, $pagesEvents, 'pe') ?>
     <div class="toolbar">
-      <input class="input" type="search" placeholder="Filtrer (mort, chat, commande…)" data-filter-input="#server-events" aria-label="Filtrer les événements">
+      <input class="input" type="search" placeholder="Filtrer la page affichée (mort, chat, commande…)" data-filter-input="#server-events" aria-label="Filtrer les événements">
     </div>
     <div class="card table-wrap">
       <table class="table table--compact" id="server-events">
@@ -139,6 +172,9 @@ require APP_ROOT . '/templates/header.php';
         </tbody>
       </table>
     </div>
+    <?= pagination($pe, $pagesEvents, function ($p) use ($logUrl) {
+        return $logUrl(['pe' => $p]);
+    }) ?>
     <?php if (!$events): ?><p class="muted empty-note">Rien pour le moment : les événements sont enregistrés au fil des synchronisations.</p><?php endif; ?>
     <p class="muted empty-note" data-filter-empty hidden>Aucun événement ne correspond.</p>
   </section>

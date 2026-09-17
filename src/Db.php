@@ -4,7 +4,7 @@
  */
 final class Db
 {
-    const SCHEMA_VERSION = 9;
+    const SCHEMA_VERSION = 10;
 
     /** Colonnes ajoutées après la première version (ajoutées automatiquement si absentes). */
     const EXTRA_COLUMNS = [
@@ -240,7 +240,10 @@ final class Db
         ]);
         foreach (['CREATE INDEX IF NOT EXISTS idx_events_player ON server_events (player_lc, at)',
                   'CREATE INDEX IF NOT EXISTS idx_events_at ON server_events (at)',
-                  'CREATE INDEX IF NOT EXISTS idx_log_account ON admin_log (account_id)'] as $sql) {
+                  'CREATE INDEX IF NOT EXISTS idx_log_account ON admin_log (account_id)',
+                  'CREATE INDEX IF NOT EXISTS idx_log_name ON admin_log (username_lc)',
+                  'CREATE INDEX IF NOT EXISTS idx_log_date ON admin_log (created_at)',
+                  'CREATE INDEX IF NOT EXISTS idx_log_action ON admin_log (action, created_at)'] as $sql) {
             try {
                 $pdo->exec($sql);
             } catch (PDOException $e) {

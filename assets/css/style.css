@@ -753,6 +753,9 @@ textarea.input { height: auto; min-height: 84px; padding: 10px 12px; line-height
 .console__bar { display: flex; align-items: center; gap: 8px; }
 .console__input { flex: 1; font-family: var(--mono); }
 .console__past { font-family: var(--mono); font-size: 12px; }
+.toolbar--log { justify-content: space-between; margin-bottom: 10px; font-size: 13px; }
+.perpage { display: inline-flex; align-items: center; gap: 8px; color: var(--muted); }
+.perpage__on { color: var(--text); }
 .event-kind { white-space: nowrap; }
 .event-kind .mc-icon { width: 18px; height: 18px; margin-right: 6px; }
 .log-detail { max-width: 520px; overflow-wrap: anywhere; }
