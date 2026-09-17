@@ -1,6 +1,15 @@
 <?php
 require __DIR__ . '/src/web.php';
 
+if (MapData::enabled() && !Auth::canSeePrivate()) {
+    $pageTitle = 'Carte';
+    $nav = 'map';
+    require APP_ROOT . '/templates/header.php';
+    echo '<div class="auth-wrap auth-wrap--locked">' . locked_card('Connecte-toi pour voir la carte', 'carte.php') . '</div>';
+    require APP_ROOT . '/templates/footer.php';
+    exit;
+}
+
 $enabled = MapData::enabled();
 $worlds = $enabled ? MapData::worlds() : [];
 $players = $worlds ? MapData::players($worlds) : [];

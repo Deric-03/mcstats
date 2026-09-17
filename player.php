@@ -399,6 +399,9 @@ require APP_ROOT . '/templates/header.php';
 <?php if ($pd): ?>
 <!-- Inventaire & état -->
 <section class="panel stack" id="panel-inventaire" role="tabpanel" aria-label="Inventaire et état">
+  <?php if (!Auth::canSeePrivate()): ?>
+  <?= locked_card('Connecte-toi pour voir l\'inventaire', 'player.php?p=' . rawurlencode($name)) ?>
+  <?php else: ?>
   <div class="inv-layout">
     <?php if ($showInv): ?>
     <div class="stack">
@@ -458,6 +461,7 @@ require APP_ROOT . '/templates/header.php';
       <?php endif; ?>
     </div>
   </div>
+  <?php endif; ?>
 </section>
 <?php endif; ?>
 

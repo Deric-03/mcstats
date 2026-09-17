@@ -8,6 +8,11 @@ header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store');
 header('X-Content-Type-Options: nosniff');
 
+if (MapData::enabled() && !Auth::canSeePrivate()) {
+    http_response_code(403);
+    echo json_encode(['error' => 'Connexion requise']);
+    exit;
+}
 if (!MapData::enabled()) {
     http_response_code(404);
     echo json_encode(['error' => 'Carte désactivée']);

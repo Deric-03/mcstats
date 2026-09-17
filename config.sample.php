@@ -56,6 +56,10 @@ return [
         'display_address' => '',            // adresse affichée aux visiteurs, ex. "play.monserveur.fr" ('' = masquée)
         'timeout'         => 2,             // secondes
         'cache_seconds'   => 20,            // durée de cache du statut
+        // RCON : ajout automatique à la whitelist quand une demande est validée (voir README).
+        // Laisser le mot de passe vide pour faire la whitelist à la main.
+        'rcon_port'       => 25575,
+        'rcon_password'   => '',
     ],
 
     // ------------------------------------------------------------------
@@ -64,13 +68,31 @@ return [
     'map' => [
         'enabled'    => false,                   // true une fois Pl3xMap installé
         'tiles_path' => __DIR__ . '/map/tiles',  // dossier "tiles" de Pl3xMap sur le disque
-        'tiles_url'  => 'map/tiles',             // ce même dossier vu depuis le navigateur
+        // Adresse publique du dossier "tiles". Vide (recommandé) : les images passent par le site,
+        // qui les réserve aux joueurs connectés quand les comptes sont activés.
+        'tiles_url'  => '',
         // Afficher la dernière position connue des joueurs hors ligne
         // (ignoré si show_position = false : seuls les joueurs connectés apparaissent)
         'show_offline_players' => true,
         'refresh_seconds' => 5,                  // rafraîchissement des positions dans le navigateur
         // Au chargement, centrer la carte sur la zone où il y a le plus de joueurs (sinon : point d'apparition)
         'center_on_players' => true,
+    ],
+
+    // ------------------------------------------------------------------
+    // Comptes et demandes de whitelist (voir README)
+    // ------------------------------------------------------------------
+    'accounts' => [
+        // true : formulaire de demande de whitelist, comptes joueurs, espace admin.
+        // La carte et les inventaires sont alors réservés aux joueurs connectés.
+        'enabled' => false,
+        // Accepter les demandes des joueurs Bedrock (Geyser / Floodgate)
+        'bedrock' => true,
+        // Préfixe des pseudos Bedrock (réglage username-prefix de Floodgate)
+        'bedrock_prefix' => '.',
+        // Commandes envoyées au serveur par RCON quand une demande est validée
+        'whitelist_java'    => 'whitelist add {name}',
+        'whitelist_bedrock' => 'fwhitelist add {gamertag}',
     ],
 
     // ------------------------------------------------------------------

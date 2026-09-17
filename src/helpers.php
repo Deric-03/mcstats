@@ -288,6 +288,48 @@ function http_get(string $url, int $timeout = 10): ?string
     return $body === false ? null : $body;
 }
 
+/**
+ * Requête HTTP GET renvoyant le code de réponse, pour distinguer « introuvable » d'une panne.
+ * @return array{0:int,1:string} [code HTTP (0 = pas de réponse), corps]
+ */
+function http_fetch(string $url, int $timeout = 6): array
+{
+    $ua = 'MCStats/' . APP_VERSION;
+    if (function_exists('curl_init')) {
+        $ch = curl_init($url);
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_FOLLOWLOCATION => true,
+            CURLOPT_CONNECTTIMEOUT => min(5, $timeout),
+            CURLOPT_TIMEOUT => $timeout,
+            CURLOPT_USERAGENT => $ua,
+        ]);
+        $body = curl_exec($ch);
+        $code = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+        if ($body !== false) {
+            return [$code, (string) $body];
+        }
+        // échec réseau / certificats côté cURL : on retente avec les flux PHP
+    }
+    $ctx = stream_context_create(['http' => ['timeout' => $timeout, 'user_agent' => $ua, 'ignore_errors' => true]]);
+    $body = @file_get_contents($url, false, $ctx);
+    $code = 0;
+    foreach ($http_response_header ?? [] as $line) {
+        if (preg_match('#^HTTP/\S+\s+(\d{3})#', $line, $m)) {
+            $code = (int) $m[1];
+        }
+    }
+    return [$code, $body === false ? '' : $body];
+}
+
+/** Adresse de retour après connexion : uniquement une page du site (évite les redirections vers l'extérieur). */
+function safe_return($value): string
+{
+    $value = is_string($value) ? $value : '';
+    return preg_match('#^[a-z]+\.php(\?[A-Za-z0-9_\-.%=&+]*)?$#', $value) ? $value : '';
+}
+
 /** Télécharge un fichier volumineux sur disque. */
 function http_download(string $url, string $dest, int $timeout = 600): bool
 {

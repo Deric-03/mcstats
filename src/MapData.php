@@ -26,7 +26,7 @@ final class MapData
 
     public static function tilesUrl(): string
     {
-        return rtrim((string) App::cfg('map.tiles_url', 'map/tiles'), '/');
+        return rtrim((string) App::cfg('map.tiles_url', ''), '/');
     }
 
     /** Positions des joueurs hors ligne affichées ? */

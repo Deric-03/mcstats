@@ -365,6 +365,27 @@
     });
   }
 
+  /* ------------------------------------------------------------ Formulaires */
+  function initForms() {
+    // Demande de whitelist : libellés selon l'édition (Java / Bedrock)
+    var sw = $('[data-edition-switch]');
+    if (sw) {
+      var update = function () {
+        var checked = $('input[name="edition"]:checked', sw);
+        var ed = checked ? checked.value : 'java';
+        $$('[data-java][data-bedrock]').forEach(function (el) { el.textContent = el.getAttribute('data-' + ed); });
+      };
+      $$('input[name="edition"]', sw).forEach(function (r) { r.addEventListener('change', update); });
+      update();
+    }
+    // Confirmation avant les actions sensibles (refuser, supprimer…)
+    $$('form[data-confirm]').forEach(function (form) {
+      form.addEventListener('submit', function (e) {
+        if (!window.confirm(form.getAttribute('data-confirm'))) e.preventDefault();
+      });
+    });
+  }
+
   function init() {
     $$('[data-search]').forEach(initSearch);
     $$('[data-tabs]').forEach(initTabs);
@@ -372,6 +393,7 @@
     initTooltips();
     initCopy();
     initFilters();
+    initForms();
     initCharts();
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);

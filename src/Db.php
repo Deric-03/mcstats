@@ -4,7 +4,7 @@
  */
 final class Db
 {
-    const SCHEMA_VERSION = 2;
+    const SCHEMA_VERSION = 3;
 
     /** Colonnes ajoutées après la première version (ajoutées automatiquement si absentes). */
     const EXTRA_COLUMNS = [
@@ -139,6 +139,38 @@ final class Db
             distance BIGINT NOT NULL DEFAULT 0,
             advancements INT NOT NULL DEFAULT 0,
             PRIMARY KEY (uuid, day)
+        )' . $suffix);
+
+        // Comptes du site : une demande de whitelist crée un compte en attente, activé à la validation
+        $id = self::driver() === 'sqlite' ? 'id INTEGER PRIMARY KEY AUTOINCREMENT' : 'id INT NOT NULL AUTO_INCREMENT PRIMARY KEY';
+        $pdo->exec("CREATE TABLE IF NOT EXISTS accounts (
+            $id,
+            username VARCHAR(40) NOT NULL,
+            username_lc VARCHAR(40) NOT NULL UNIQUE,
+            edition VARCHAR(10) NOT NULL DEFAULT 'java',
+            uuid VARCHAR(36) NOT NULL DEFAULT '',
+            verified TINYINT NOT NULL DEFAULT 1,
+            password_hash VARCHAR(255) NOT NULL,
+            status VARCHAR(12) NOT NULL DEFAULT 'pending',
+            is_admin TINYINT NOT NULL DEFAULT 0,
+            must_change_password TINYINT NOT NULL DEFAULT 0,
+            message VARCHAR(500) NOT NULL DEFAULT '',
+            admin_note VARCHAR(500) NOT NULL DEFAULT '',
+            created_at BIGINT NOT NULL DEFAULT 0,
+            decided_at BIGINT NOT NULL DEFAULT 0,
+            last_login BIGINT NOT NULL DEFAULT 0
+        )" . $suffix);
+
+        $pdo->exec('CREATE TABLE IF NOT EXISTS auth_sessions (
+            token_hash CHAR(64) NOT NULL PRIMARY KEY,
+            account_id INT NOT NULL,
+            created_at BIGINT NOT NULL DEFAULT 0,
+            expires_at BIGINT NOT NULL DEFAULT 0
+        )' . $suffix);
+
+        $pdo->exec('CREATE TABLE IF NOT EXISTS auth_attempts (
+            k VARCHAR(120) NOT NULL,
+            at BIGINT NOT NULL DEFAULT 0
         )' . $suffix);
 
         // Colonnes de catégories (une par statistique classée)

@@ -17,6 +17,11 @@ try {
     render_fatal('Base de données inaccessible', "Le site n'arrive pas à se connecter à la base de données. Vérifiez la section \"db\" de config.php.");
 }
 
+if (Auth::enabled()) {
+    // cookie du jeton anti-CSRF, posé avant tout affichage
+    Auth::csrfToken();
+}
+
 Sync::maybeRun();
 
 function render_fatal(string $title, string $message): void

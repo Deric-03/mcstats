@@ -89,8 +89,9 @@
     getTileUrl: function (c) {
       var w = this.options.world;
       var folder = Math.max(0, w.maxOut - c.z);
-      return cfg.tilesUrl + '/' + encodeURIComponent(w.name) + '/' + folder + '/' + encodeURIComponent(w.renderer) +
-        '/' + c.x + '_' + c.y + '.' + w.format;
+      var path = w.name + '/' + folder + '/' + w.renderer + '/' + c.x + '_' + c.y + '.' + w.format;
+      // sans adresse publique configurée, les images passent par le site (réservées aux joueurs connectés)
+      return cfg.tilesUrl ? cfg.tilesUrl + '/' + path.split('/').map(encodeURIComponent).join('/') : 'api/tile.php?t=' + encodeURIComponent(path);
     }
   });
 

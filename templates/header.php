@@ -27,7 +27,7 @@ $favicon = Mc::iconUrl('grass_block');
 <link rel="stylesheet" href="<?= h(asset_url('assets/css/style.css')) ?>">
 </head>
 <body<?= !empty($bodyClass) ? ' class="' . h($bodyClass) . '"' : '' ?>>
-<header class="topbar">
+<header class="topbar<?= Auth::enabled() ? ' topbar--compact' : '' ?>">
   <div class="container topbar__inner">
     <a class="brand" href="index.php"><?= mc_icon('grass_block', '', 'brand__icon') ?><span class="brand__name"><?= h($siteName) ?></span></a>
     <nav class="nav" aria-label="Navigation principale">
@@ -42,6 +42,19 @@ $favicon = Mc::iconUrl('grass_block');
     </form>
     <?php if (App::cfg('server.enabled', true)): ?>
       <a class="status-pill" href="index.php#serveur" data-status-pill><span class="dot"></span><span data-status-pill-text>Serveur…</span></a>
+    <?php endif; ?>
+    <?php if (Auth::enabled()): $me = Auth::user(); ?>
+    <div class="account">
+      <?php if ($me): ?>
+        <?php if (!empty($me['is_admin'])): $pendingCount = Auth::pendingCount(); ?>
+          <a class="account__admin<?= $nav === 'admin' ? ' is-active' : '' ?>" href="admin.php"<?= $pendingCount ? ' title="' . $pendingCount . ' demande(s) de whitelist en attente"' : '' ?>>Admin<?php if ($pendingCount): ?><span class="badge-count"><?= $pendingCount ?></span><?php endif; ?></a>
+        <?php endif; ?>
+        <a class="account__user<?= $nav === 'compte' ? ' is-active' : '' ?>" href="compte.php" title="Mon compte"><?= head_img($me['uuid'] !== '' ? $me['uuid'] : $me['username'], 24) ?><span><?= h($me['username']) ?></span></a>
+      <?php else: $here = safe_return(basename((string) $_SERVER['SCRIPT_NAME']) . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SERVER['QUERY_STRING'] : '')); ?>
+        <a class="btn btn--ghost btn--sm" href="connexion.php<?= $here !== '' && !in_array($nav, ['connexion', 'demande'], true) ? '?retour=' . h(rawurlencode($here)) : '' ?>">Connexion</a>
+        <a class="btn btn--primary btn--sm" href="demande.php">Rejoindre</a>
+      <?php endif; ?>
+    </div>
     <?php endif; ?>
   </div>
 </header>

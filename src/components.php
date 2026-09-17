@@ -222,6 +222,28 @@ function coords(?array $pos): string
     return 'X ' . (int) $pos[0] . ' · Y ' . (int) $pos[1] . ' · Z ' . (int) $pos[2];
 }
 
+/** Encadré affiché à la place d'un contenu réservé aux joueurs connectés. */
+function locked_card(string $title, string $return = ''): string
+{
+    $return = safe_return($return);
+    return '<div class="card locked">'
+        . mc_icon('barrier', '', 'mc-icon--lg')
+        . '<h2>' . h($title) . '</h2>'
+        . '<p class="muted">La carte, les positions et les inventaires sont réservés aux joueurs du serveur. '
+        . 'Demande la whitelist pour rejoindre le serveur et créer ton compte, ou connecte-toi si tu en as déjà un.</p>'
+        . '<div class="locked__actions">'
+        . '<a class="btn btn--primary" href="demande.php">Demander la whitelist</a>'
+        . '<a class="btn btn--ghost" href="connexion.php' . ($return !== '' ? '?retour=' . h(rawurlencode($return)) : '') . '">Se connecter</a>'
+        . '</div></div>';
+}
+
+/** Étiquette de statut d'un compte. */
+function account_status_tag(string $status): string
+{
+    $cls = ['active' => 'tag--ok', 'pending' => 'tag--warn', 'refused' => 'tag--danger', 'disabled' => 'tag--muted'][$status] ?? '';
+    return '<span class="tag ' . $cls . '">' . h(Whitelist::STATUS_LABELS[$status] ?? $status) . '</span>';
+}
+
 function pagination(int $page, int $pages, callable $url): string
 {
     if ($pages <= 1) {

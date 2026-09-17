@@ -26,6 +26,9 @@ require APP_ROOT . '/templates/header.php';
       <button class="btn btn--primary" type="submit">Rechercher</button>
       <div class="search__results" hidden></div>
     </form>
+    <?php if (Auth::enabled() && !Auth::user()): ?>
+      <p class="hero__join">Tu veux jouer sur le serveur ? <a class="link-more" href="demande.php">Demander la whitelist →</a></p>
+    <?php endif; ?>
   </div>
 
   <?php if (App::cfg('server.enabled', true)): ?>

@@ -285,18 +285,82 @@ serveur web intégré est désactivé. C'est Apache qui les sert, aucun port sup
    'map' => ['enabled' => true],
    ```
 
-5. Rechargez la configuration Apache (étape 8) : elle demande aux navigateurs de revalider les images
-   de la carte, qui changent en continu.
+5. Rechargez la configuration Apache (étape 8). Elle ferme l'accès direct au dossier `map/` : les images de
+   la carte sont servies par le site (`api/tile.php`), ce qui permet de les réserver aux joueurs connectés
+   (étape 12). La carte d'origine de Pl3xMap sur `/map/` n'est donc plus accessible.
 
 Sur la carte :
 
 - les joueurs connectés apparaissent en direct (positions fournies par Pl3xMap) ;
 - les joueurs hors ligne apparaissent à leur dernière position connue, sauf si `show_position` ou
   `map.show_offline_players` vaut `false` ;
-- les joueurs de `hidden_players` n'apparaissent jamais sur la page du site. Pl3xMap publie aussi sa
-  propre carte sur `/map/` : pour y masquer un joueur, tapez `map hide <joueur>` dans la console ;
-- chaque profil propose un bouton « Voir sur la carte », et `carte.php?p=Pseudo` centre la carte sur un joueur.
+- les joueurs de `hidden_players` n'apparaissent jamais sur la carte ;
+- chaque profil propose un bouton « Voir sur la carte », et `carte.php?p=Pseudo` centre la carte sur un joueur ;
 - à l'ouverture, la carte se centre sur la zone où il y a le plus de joueurs (connectés en priorité, sinon leurs dernières positions), dans la bonne dimension. Mettre `'center_on_players' => false` dans la section `map` pour toujours ouvrir sur le point d'apparition.
+
+## 12. Comptes et demandes de whitelist
+
+Les joueurs demandent la whitelist depuis le site (bouton « Rejoindre ») : la demande crée leur compte, et
+la validation par un admin active le compte **et** ajoute le joueur à la whitelist du serveur. La carte, les
+positions et les inventaires sont alors réservés aux joueurs connectés ; le reste du site reste public.
+
+- **Java** : le pseudo est vérifié auprès de Mojang (un pseudo inexistant est refusé) et la casse est corrigée.
+- **Bedrock** (Geyser / Floodgate) : le gamertag est vérifié auprès de l'API de GeyserMC, qui ne connaît que
+  les joueurs déjà passés sur un serveur Geyser. Un gamertag inconnu est accepté mais marqué
+  « Gamertag non vérifié » dans l'espace admin. Le compte prend le préfixe Floodgate (`bedrock_prefix`).
+
+### Activer
+
+1. Dans `config.php` :
+
+   ```php
+   'accounts' => ['enabled' => true],
+   ```
+
+2. RCON, pour que la validation ajoute le joueur à la whitelist. Dans `server.properties` du serveur
+   Minecraft (mot de passe long et aléatoire), puis redémarrer le serveur :
+
+   ```properties
+   enable-rcon=true
+   rcon.port=25575
+   rcon.password=un-long-mot-de-passe-aleatoire
+   ```
+
+   **N'ouvrez jamais le port 25575 sur votre box** : seul le site, sur la même machine, doit y accéder.
+   Puis dans `config.php`, section `server` :
+
+   ```php
+   'rcon_password' => 'un-long-mot-de-passe-aleatoire',
+   ```
+
+   Sans RCON, la validation active seulement le compte et l'espace admin indique la commande à taper dans la
+   console. Les commandes envoyées sont réglables (`whitelist_java`, `whitelist_bedrock`).
+
+3. Premier admin : faites votre propre demande sur le site, puis activez-la en admin sur le serveur
+   (personne ne peut devenir admin depuis le site) :
+
+   ```bash
+   php /var/www/html/mcstats/cron/admin.php VotrePseudo
+   ```
+
+   `php cron/admin.php --liste` affiche les admins, `php cron/admin.php Pseudo --retirer` retire les droits.
+
+### Espace admin
+
+Le lien « Admin » de l'en-tête affiche le nombre de demandes en attente. Pour chaque demande : édition,
+message du joueur, indication « Déjà whitelisté » et « A déjà joué sur le serveur », boutons Valider /
+Refuser. Pour les comptes : nouveau mot de passe provisoire (mot de passe oublié : le joueur devra le
+changer à sa prochaine connexion), désactivation, suppression. Désactiver ou supprimer un compte ne retire
+pas le joueur de la whitelist du serveur.
+
+### Sécurité
+
+- Mots de passe chiffrés (bcrypt), jamais stockés en clair ; 8 caractères minimum.
+- Session de 30 jours dans un cookie HttpOnly (Secure en HTTPS) ; seule son empreinte est en base.
+  Changer de mot de passe ferme les autres sessions.
+- Formulaires protégés contre les requêtes intersites (jeton CSRF).
+- 5 échecs de connexion par pseudo en 15 minutes, puis blocage temporaire ; 5 demandes de whitelist par
+  adresse IP par heure.
 
 ## Dépannage
 
@@ -311,6 +375,8 @@ Sur la carte :
 | Graphiques vides | Normal les premiers jours : l'historique se construit jour après jour. |
 | Ancien skin affiché après un changement | Le skin est revérifié auprès de Mojang à la connexion du joueur, puis toutes les 10 min tant qu'il est en ligne (toutes les 6 h sinon). Il faut `mojang_lookup` à `true` (valeur par défaut). |
 | « La carte n'est pas encore disponible » | Vérifier `'map' => ['enabled' => true]` dans `config.php`, et que Pl3xMap a bien créé `map/tiles/settings.json` (étape 11). |
+| « Connecte-toi pour voir la carte » alors qu'on veut une carte publique | Les comptes sont activés : la carte est réservée aux joueurs connectés. Mettre `'accounts' => ['enabled' => false]` pour tout rendre public. |
+| La validation d'une demande échoue (« connexion RCON impossible ») | Le serveur Minecraft doit être allumé, avec `enable-rcon=true` et le même mot de passe que `server.rcon_password`. |
 | Carte grise ou trouée | Le rendu n'est pas terminé (`map status` dans la console), ou Apache ne peut pas lire les images : vérifier avec `ls -l /var/www/html/mcstats/map/tiles`. |
 
 ## Structure du projet
@@ -322,9 +388,11 @@ mcstats/
 ├── players.php          Liste des joueurs
 ├── player.php           Profil d'un joueur / résultats de recherche
 ├── carte.php            Carte du monde (images Pl3xMap)
-├── api/                 search.php (autocomplétion), status.php (statut serveur), map.php (positions)
+├── demande.php          Demande de whitelist (création du compte)
+├── connexion.php        Connexion · compte.php : mon compte · admin.php : espace admin
+├── api/                 search.php (autocomplétion), status.php (statut serveur), map.php (positions), tile.php (images de la carte)
 ├── apache/mcstats.conf  Configuration Apache (protections, cache)
-├── cron/sync.php        Synchronisation en ligne de commande
+├── cron/                sync.php (synchronisation), admin.php (gestion des admins)
 ├── src/                 Code PHP (lecture NBT, synchro, base de données, statut…)
 ├── templates/           En-tête et pied de page
 ├── assets/              CSS, JS, Chart.js, Leaflet, icônes Minecraft (assets/mc)
