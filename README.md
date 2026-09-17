@@ -489,6 +489,12 @@ Sur le profil d'un joueur :
 - les icônes se changent dans `config.php`, section `map` : `spawn_icon` pour le point d'apparition
   (objet Minecraft, par défaut la boussole) et `home_icon` pour les homes (vide = le lit dessiné pour le site).
 
+Le réglage `map.extra_zoom_out` (3 par défaut, 0 à 6) ajoute des niveaux de dézoom au-delà de ceux générés
+par Pl3xMap : les images du dernier niveau sont réduites par le navigateur, ce qui permet de voir le monde
+entier d'un coup. Les images ne sont pas regénérées et les autres niveaux ne changent pas ; pour plus de
+détail à ces distances, il faut augmenter le nombre de niveaux de dézoom dans la configuration de Pl3xMap
+(réglage `zoom.max-out` du monde) puis relancer un rendu complet.
+
 **Qui peut les voir ?** Quand les comptes sont activés (étape 12), le coffre de l'Ender, le sac à dos et les
 homes sont **privés** : seuls le joueur, sur son propre profil (marqué du badge « Vous »), et les admins, sur
 tous les profils, les voient. Une étiquette « Privé » le rappelle sur chaque carte. Les autres joueurs

@@ -77,6 +77,9 @@ return [
         'refresh_seconds' => 5,                  // rafraîchissement des positions dans le navigateur
         // Au chargement, centrer la carte sur la zone où il y a le plus de joueurs (sinon : point d'apparition)
         'center_on_players' => true,
+        // Niveaux de dézoom en plus de ceux générés par Pl3xMap (0 à 6) : les images du dernier
+        // niveau sont réduites par le navigateur, ce qui permet de voir le monde entier d'un coup.
+        'extra_zoom_out' => 3,
         // Icônes de la carte. Le point d'apparition prend une icône d'objet Minecraft (compass,
         // lodestone, respawn_anchor…). Les homes sont marqués du lit dessiné pour le site ;
         // indiquer un objet Minecraft ici pour le remplacer.

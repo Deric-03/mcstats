@@ -52,6 +52,7 @@ if (!$worlds): ?>
         'showCoords'  => (bool) App::cfg('show_position', true),
         'showOffline' => MapData::showOffline(),
         'centerOnPlayers' => (bool) App::cfg('map.center_on_players', true),
+        'extraZoomOut' => max(0, min(6, (int) App::cfg('map.extra_zoom_out', 3))),
         'spawnIcon'   => Mc::iconUrl((string) App::cfg('map.spawn_icon', 'compass')),
         'homes'       => $homesOn ? [
             'admin' => $homesAdmin,

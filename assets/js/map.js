@@ -45,7 +45,9 @@
 
   // Repère identique à Pl3xMap : axe Z vers le bas, 1 pixel = 1 bloc au zoom natif
   var crs = L.extend({}, L.CRS.Simple, { transformation: new L.Transformation(1, 0, 1, 0) });
-  var map = L.map(el, { crs: crs, center: [0, 0], zoom: 0, zoomSnap: 1, zoomDelta: 1, attributionControl: true, zoomControl: false });
+  // Dézoom au-delà des images générées par Pl3xMap : Leaflet réduit les images du dernier niveau.
+  var EXTRA_OUT = Math.max(0, Math.min(6, cfg.extraZoomOut === undefined ? 3 : cfg.extraZoomOut));
+  var map = L.map(el, { crs: crs, center: [0, 0], zoom: 0, minZoom: -EXTRA_OUT, zoomSnap: 1, zoomDelta: 1, attributionControl: true, zoomControl: false });
   map.attributionControl.setPrefix('<a href="https://modrinth.com/plugin/pl3xmap" target="_blank" rel="noopener">Pl3xMap</a> · <a href="https://leafletjs.com" target="_blank" rel="noopener">Leaflet</a>');
 
   var ICON_HIDE = '<svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path d="M10 3 5 8l5 5M13 3v10" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
@@ -94,7 +96,7 @@
   var PlTiles = L.TileLayer.extend({
     getTileUrl: function (c) {
       var w = this.options.world;
-      var folder = Math.max(0, w.maxOut - c.z);
+      var folder = Math.min(w.maxOut, Math.max(0, w.maxOut - c.z));
       var path = w.name + '/' + folder + '/' + w.renderer + '/' + c.x + '_' + c.y + '.' + w.format;
       // sans adresse publique configurée, les images passent par le site (réservées aux joueurs connectés)
       return cfg.tilesUrl ? cfg.tilesUrl + '/' + path.split('/').map(encodeURIComponent).join('/') : 'api/tile.php?t=' + encodeURIComponent(path);
@@ -113,7 +115,7 @@
     var v = view || { x: w.spawn.x, z: w.spawn.z, zoom: Math.max(0, w.maxOut - w.zoom) };
     if (tiles) map.removeLayer(tiles);
     if (spawnMarker) map.removeLayer(spawnMarker);
-    map.setMinZoom(0);
+    map.setMinZoom(-EXTRA_OUT);
     map.setMaxZoom(w.maxOut + w.maxIn);
     map.setView(toLatLng(v.x, v.z), v.zoom, { animate: false });
     tiles = new PlTiles('', {
@@ -122,12 +124,13 @@
       noWrap: true,
       minNativeZoom: 0,
       maxNativeZoom: w.maxOut,
-      minZoom: 0,
+      minZoom: -EXTRA_OUT,
       maxZoom: w.maxOut + w.maxIn,
       className: 'map-tiles',
       attribution: ''
     }).addTo(map);
     el.setAttribute('data-dimension', w.type);
+    farZoom();
     if (cfg.spawnIcon) {
       spawnMarker = L.marker(toLatLng(w.spawn.x + 0.5, w.spawn.z + 0.5), {
         icon: L.divIcon({ className: 'map-spawn', html: '<span style="background-image:url(\'' + esc(cfg.spawnIcon) + '\')"></span>', iconSize: [20, 20], iconAnchor: [10, 10] }),
@@ -221,6 +224,12 @@
       else if (playerHomesLabel) setHomes('player', playerHomes, playerHomesLabel);
     });
   });
+
+  // Sous le zoom 0, les images sont réduites : lissage plutôt que pixels, plus lisible de loin
+  function farZoom() {
+    el.classList.toggle('is-far', map.getZoom() < 0);
+  }
+  map.on('zoomend', farZoom);
 
   function visible(p) {
     return p.online || showOffline;
@@ -391,7 +400,7 @@
       var bounds = L.latLngBounds(latLngIn(w, minX, minZ), latLngIn(w, maxX + 1, maxZ + 1));
       zoom = map.getBoundsZoom(bounds, false, L.point(160, 160));
     }
-    return { world: w.name, x: (minX + maxX) / 2 + 0.5, z: (minZ + maxZ) / 2 + 0.5, zoom: Math.max(0, Math.min(zoom, w.maxOut)) };
+    return { world: w.name, x: (minX + maxX) / 2 + 0.5, z: (minZ + maxZ) / 2 + 0.5, zoom: Math.max(-EXTRA_OUT, Math.min(zoom, w.maxOut)) };
   }
 
   // Vue de départ : joueur demandé (?p=), coordonnées (?x=&z=&w=), zone la plus peuplée ou point d'apparition
