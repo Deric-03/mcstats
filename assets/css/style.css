@@ -146,6 +146,7 @@ select.input {
 .card__head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
 .card__head h3 { font-size: 16px; }
 .card__head .muted { font-size: 13px; }
+.card__head .tag { margin-right: auto; }
 .empty { padding: 32px; text-align: center; }
 .empty p + p { margin-top: 6px; }
 .empty-note { padding: 10px 2px; font-size: 14px; }
@@ -704,8 +705,6 @@ textarea.input { height: auto; min-height: 84px; padding: 10px 12px; line-height
 .report-box { border-color: rgba(229, 72, 77, .35); }
 
 /* Sac à dos & homes */
-.private-note { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 14px; }
-.perso-layout > * { min-width: 0; }
 .homes-table__world { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
 .homes-table__world .mc-icon { width: 18px; height: 18px; }
 .homes-table .link-more { font-size: inherit; white-space: normal; }

@@ -11,8 +11,8 @@ Minecraft Java, façon « tracker » :
   détails combat / minage / déplacements, les 126 succès avec leur date d'obtention,
   inventaire et coffre de l'Ender (avec enchantements et contenu des shulkers), vie, faim, XP, position.
 - **Recherche** de joueur avec autocomplétion (pseudo ou UUID).
-- **Comptes joueurs** (optionnels) : demandes de whitelist, espace admin, et sur son propre profil le badge
-  « Vous », le contenu du sac à dos et la liste des homes (plugins, voir plus bas).
+- **Comptes joueurs** (optionnels) : demandes de whitelist, espace admin, badge « Vous » sur son propre
+  profil, et contenus privés (coffre de l'Ender, sac à dos, homes) réservés au joueur et aux admins.
 
 Les fichiers du serveur (`stats/`, `advancements/`, `data/`) sont lus **chaque minute** et stockés dans
 MariaDB : les visiteurs ne touchent jamais aux fichiers du serveur. Seuls les joueurs dont les fichiers ont
@@ -118,7 +118,7 @@ Les réglages essentiels :
 | `server.display_address` | Adresse affichée aux visiteurs avec un bouton « Copier » (laisser vide pour la masquer). |
 | `hidden_players` | Pseudos ou UUID à masquer du site (ex. comptes admin). |
 | `show_position` | `false` pour masquer coordonnées, point de réapparition et lieu de la dernière mort. |
-| `show_inventory` | `false` pour masquer l'inventaire et le coffre de l'Ender. |
+| `show_inventory` | `false` pour masquer l'inventaire, le coffre de l'Ender et le sac à dos. |
 | `plugins` | Fichier `backpack.db` de Minepacks et dossier des homes (étape 13). |
 | `score_weights` | Pondérations du score général (voir plus bas). |
 
@@ -400,16 +400,21 @@ Refuser une demande signalée clôt aussi le signalement. 3 signalements au maxi
 - 5 échecs de connexion par pseudo en 15 minutes, puis blocage temporaire ; 5 demandes de whitelist par
   adresse IP par heure.
 
-## 13. Sac à dos et homes (plugins)
+## 13. Contenus privés : sac à dos et homes (plugins)
 
-Sur le profil d'un joueur, l'onglet « Sac à dos & homes » montre le contenu de son sac à dos
-([Minepacks](https://www.spigotmc.org/resources/minepacks.19286/)) et la liste de ses homes
-([UltimateHomes](https://www.spigotmc.org/resources/64210/) ou [EssentialsX](https://essentialsx.net)) : nom,
-dimension, coordonnées, avec un lien vers la carte quand Pl3xMap est installé.
+Sur le profil d'un joueur :
 
-**Qui peut le voir ?** Il faut que les comptes soient activés (étape 12). Le joueur connecté voit l'onglet sur
-son propre profil, marqué du badge « Vous ». Les admins le voient sur tous les profils. Les visiteurs et les
-autres joueurs ne le voient pas.
+- onglet **« Inventaire & état »** : le contenu de son sac à dos
+  ([Minepacks](https://www.spigotmc.org/resources/minepacks.19286/)), sous l'inventaire et le coffre de l'Ender ;
+- onglet **« Déplacements »** : la liste de ses homes
+  ([UltimateHomes](https://www.spigotmc.org/resources/64210/) ou [EssentialsX](https://essentialsx.net)) —
+  nom, dimension et coordonnées, avec un lien vers la carte quand Pl3xMap est installé.
+
+**Qui peut les voir ?** Quand les comptes sont activés (étape 12), le coffre de l'Ender, le sac à dos et les
+homes sont **privés** : seuls le joueur, sur son propre profil (marqué du badge « Vous »), et les admins, sur
+tous les profils, les voient. Une étiquette « Privé » le rappelle sur chaque carte. Les autres joueurs
+connectés voient le reste du profil, inventaire compris. Sans comptes, le site est public comme avant et
+seuls le sac à dos et les homes restent masqués.
 
 1. Dans `config.php` (chemins à adapter ; laisser `''` pour désactiver l'un ou l'autre) :
 
@@ -454,7 +459,7 @@ trop ancien sont ignorés et comptés dans le journal de la synchronisation.
 | « La carte n'est pas encore disponible » | Vérifier `'map' => ['enabled' => true]` dans `config.php`, et que Pl3xMap a bien créé `map/tiles/settings.json` (étape 11). |
 | « Connecte-toi pour voir la carte » alors qu'on veut une carte publique | Les comptes sont activés : la carte est réservée aux joueurs connectés. Mettre `'accounts' => ['enabled' => false]` pour tout rendre public. |
 | La validation d'une demande échoue (« connexion RCON impossible ») | Le serveur Minecraft doit être allumé, avec `enable-rcon=true` et le même mot de passe que `server.rcon_password`. |
-| Pas d'onglet « Sac à dos & homes » | Il n'apparaît qu'au joueur connecté sur son propre profil et aux admins. Vérifier la section `plugins` de `config.php`, puis l'état des plugins en haut de l'espace admin. |
+| Pas de sac à dos ni de homes sur un profil | Ils n'apparaissent qu'au joueur sur son propre profil et aux admins. Vérifier la section `plugins` de `config.php`, puis l'état des plugins en haut de l'espace admin. |
 | « l'extension PHP SQLite est absente » dans l'espace admin | `sudo apt install php-sqlite3` ; la synchronisation suivante lira Minepacks. |
 | Carte grise ou trouée | Le rendu n'est pas terminé (`map status` dans la console), ou Apache ne peut pas lire les images : vérifier avec `ls -l /var/www/html/mcstats/map/tiles`. |
 
