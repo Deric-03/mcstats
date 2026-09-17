@@ -296,6 +296,7 @@ Sur la carte :
 - les joueurs de `hidden_players` n'apparaissent jamais sur la page du site. Pl3xMap publie aussi sa
   propre carte sur `/map/` : pour y masquer un joueur, tapez `map hide <joueur>` dans la console ;
 - chaque profil propose un bouton « Voir sur la carte », et `carte.php?p=Pseudo` centre la carte sur un joueur.
+- à l'ouverture, la carte se centre sur la zone où il y a le plus de joueurs (connectés en priorité, sinon leurs dernières positions), dans la bonne dimension. Mettre `'center_on_players' => false` dans la section `map` pour toujours ouvrir sur le point d'apparition.
 
 ## Dépannage
 

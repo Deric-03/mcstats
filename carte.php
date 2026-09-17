@@ -32,6 +32,7 @@ if (!$worlds): ?>
         'players'     => $players,
         'showCoords'  => (bool) App::cfg('show_position', true),
         'showOffline' => MapData::showOffline(),
+        'centerOnPlayers' => (bool) App::cfg('map.center_on_players', true),
         'spawnIcon'   => Mc::iconUrl('red_bed'),
         'focus'       => [
             'p' => (string) ($_GET['p'] ?? ''),

@@ -69,6 +69,8 @@ return [
         // (ignoré si show_position = false : seuls les joueurs connectés apparaissent)
         'show_offline_players' => true,
         'refresh_seconds' => 5,                  // rafraîchissement des positions dans le navigateur
+        // Au chargement, centrer la carte sur la zone où il y a le plus de joueurs (sinon : point d'apparition)
+        'center_on_players' => true,
     ],
 
     // ------------------------------------------------------------------

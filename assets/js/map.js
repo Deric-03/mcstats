@@ -79,7 +79,8 @@
   setPanelCollapsed(layout.classList.contains('is-collapsed'));
 
   function scale() { return 1 / Math.pow(2, current.maxOut); }
-  function toLatLng(x, z) { return L.latLng(z * scale(), x * scale()); }
+  function latLngIn(w, x, z) { var s = 1 / Math.pow(2, w.maxOut); return L.latLng(z * s, x * s); }
+  function toLatLng(x, z) { return latLngIn(current, x, z); }
   function toBlock(latlng) { return [Math.floor(latlng.lng / scale()), Math.floor(latlng.lat / scale())]; }
   function nativeZoom() { return current.maxOut; }
 
@@ -276,14 +277,48 @@
   }
   setInterval(poll, cfg.refresh || 5000);
 
-  // Vue de départ : joueur demandé (?p=), coordonnées (?x=&z=&w=) ou point d'apparition
+  // Zone la plus peuplée : joueurs connectés en priorité, sinon dernières positions connues.
+  // Pour chaque joueur, on compte ceux à moins de CLUSTER blocs ; le groupe le plus nombreux l'emporte
+  // (à égalité : la dimension qui vient en premier, Surface avant Nether et End).
+  var CLUSTER = 300;
+  function busiestView() {
+    var known = players.filter(function (p) { return byName[p.world]; });
+    var online = known.filter(function (p) { return p.online; });
+    var pool = online.length ? online : (showOffline ? known : []);
+    if (!pool.length) return null;
+    var best = null;
+    pool.forEach(function (p) {
+      var group = pool.filter(function (q) {
+        return q.world === p.world && Math.abs(q.x - p.x) <= CLUSTER && Math.abs(q.z - p.z) <= CLUSTER;
+      });
+      if (!best || group.length > best.length || (group.length === best.length && byName[p.world].order < byName[best[0].world].order)) {
+        best = group;
+      }
+    });
+    var w = byName[best[0].world];
+    var xs = best.map(function (q) { return q.x; }), zs = best.map(function (q) { return q.z; });
+    var minX = Math.min.apply(null, xs), maxX = Math.max.apply(null, xs);
+    var minZ = Math.min.apply(null, zs), maxZ = Math.max.apply(null, zs);
+    // un joueur seul : un cran de dézoom pour voir les alentours ; un groupe : tout le groupe à l'écran
+    var zoom = w.maxOut - 1;
+    if (best.length > 1) {
+      var bounds = L.latLngBounds(latLngIn(w, minX, minZ), latLngIn(w, maxX + 1, maxZ + 1));
+      zoom = map.getBoundsZoom(bounds, false, L.point(160, 160));
+    }
+    return { world: w.name, x: (minX + maxX) / 2 + 0.5, z: (minZ + maxZ) / 2 + 0.5, zoom: Math.max(0, Math.min(zoom, w.maxOut)) };
+  }
+
+  // Vue de départ : joueur demandé (?p=), coordonnées (?x=&z=&w=), zone la plus peuplée ou point d'apparition
   var f = cfg.focus || {};
   var target = findPlayer(f.p);
+  var busiest;
   if (target && byName[target.world]) {
     focusPlayer(target);
   } else if (f.x !== null && f.z !== null && f.x !== undefined) {
     var fw = worlds.filter(function (w) { return w.name === f.w || w.type === f.w; })[0] || worlds[0];
     setWorld(fw.name, { x: f.x, z: f.z, zoom: fw.maxOut });
+  } else if (cfg.centerOnPlayers && (busiest = busiestView())) {
+    setWorld(busiest.world, busiest);
   } else {
     setWorld(worlds[0].name);
   }
