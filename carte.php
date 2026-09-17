@@ -9,6 +9,7 @@ $pageTitle = 'Carte';
 $nav = 'map';
 $mainClass = 'main main--map';
 $useMap = (bool) $worlds;
+$bodyClass = $worlds ? 'page-map' : '';
 require APP_ROOT . '/templates/header.php';
 
 if (!$worlds): ?>

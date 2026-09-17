@@ -3,6 +3,13 @@
  * Fonctions utilitaires : échappement, formatage, rendu d'icônes, HTTP.
  */
 
+/** URL d'un fichier statique du site, avec sa date de modification pour que les navigateurs rechargent chaque nouvelle version. */
+function asset_url(string $path): string
+{
+    $file = APP_ROOT . '/' . $path;
+    return $path . '?v=' . (is_file($file) ? filemtime($file) : APP_VERSION);
+}
+
 function h($s): string
 {
     return htmlspecialchars((string) $s, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');

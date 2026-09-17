@@ -22,7 +22,7 @@ Sync::maybeRun();
 function render_fatal(string $title, string $message): void
 {
     echo '<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">'
-        . '<title>' . h($title) . '</title><link rel="stylesheet" href="assets/css/style.css?v=' . APP_VERSION . '"></head>'
+        . '<title>' . h($title) . '</title><link rel="stylesheet" href="' . h(asset_url('assets/css/style.css')) . '"></head>'
         . '<body><main class="container main"><div class="card empty"><h1>' . h($title) . '</h1><p class="muted">' . h($message) . '</p></div></main></body></html>';
     exit;
 }

@@ -24,9 +24,9 @@ $favicon = Mc::iconUrl('grass_block');
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Silkscreen&display=swap">
 <?php if (!empty($useMap)): ?><link rel="stylesheet" href="assets/vendor/leaflet.css"><?php endif; ?>
-<link rel="stylesheet" href="assets/css/style.css?v=<?= APP_VERSION ?>">
+<link rel="stylesheet" href="<?= h(asset_url('assets/css/style.css')) ?>">
 </head>
-<body>
+<body<?= !empty($bodyClass) ? ' class="' . h($bodyClass) . '"' : '' ?>>
 <header class="topbar">
   <div class="container topbar__inner">
     <a class="brand" href="index.php"><?= mc_icon('grass_block', '', 'brand__icon') ?><span class="brand__name"><?= h($siteName) ?></span></a>

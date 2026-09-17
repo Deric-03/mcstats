@@ -21,8 +21,8 @@ $syncWarning = (string) Db::meta('sync_warning', '');
 <?php endif; ?>
 <?php if (!empty($useMap)): ?>
 <script src="assets/vendor/leaflet.js" defer></script>
-<script src="assets/js/map.js?v=<?= APP_VERSION ?>" defer></script>
+<script src="<?= h(asset_url('assets/js/map.js')) ?>" defer></script>
 <?php endif; ?>
-<script src="assets/js/app.js?v=<?= APP_VERSION ?>" defer></script>
+<script src="<?= h(asset_url('assets/js/app.js')) ?>" defer></script>
 </body>
 </html>
