@@ -516,6 +516,8 @@ a.server__player:hover { background: var(--surface-3); }
 .map-empty { margin-top: 24px; }
 .map-empty code { font-family: var(--mono); font-size: 13px; color: var(--text-2); }
 .map-layout { flex: 1; min-height: 0; display: grid; grid-template-columns: 320px minmax(0, 1fr); }
+.map-layout.is-collapsed { grid-template-columns: minmax(0, 1fr); }
+.map-layout.is-collapsed .map-panel { display: none; }
 .map-panel {
   display: flex; flex-direction: column; gap: 12px; min-height: 0; padding: 16px;
   background: var(--surface); border-right: 1px solid var(--border);
@@ -572,6 +574,11 @@ a.server__player:hover { background: var(--surface-3); }
 .leaflet-bar a:hover, .leaflet-bar a:focus { background: var(--surface-3); color: var(--text); }
 .leaflet-bar a.leaflet-disabled { background: var(--surface-2); color: var(--muted); opacity: .55; }
 .leaflet-bar { border: 1px solid var(--border-strong) !important; box-shadow: 0 4px 14px rgba(0, 0, 0, .4) !important; }
+.map-panel-toggle {
+  display: flex; align-items: center; justify-content: center; width: 30px; height: 30px; padding: 0;
+  background: var(--surface-2); color: var(--text); border: 0; border-radius: 3px; cursor: pointer;
+}
+.map-panel-toggle:hover, .map-panel-toggle:focus-visible { background: var(--surface-3); }
 .leaflet-control-attribution { background: rgba(11, 14, 19, .75) !important; color: var(--muted); }
 .leaflet-control-attribution a { color: var(--text-2); }
 @media (max-width: 820px) {

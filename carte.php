@@ -42,7 +42,7 @@ if (!$worlds): ?>
     ];
 ?>
 <section class="map-layout">
-  <aside class="map-panel" aria-label="Joueurs sur la carte">
+  <aside class="map-panel" id="map-panel" aria-label="Joueurs sur la carte">
     <div class="map-panel__head">
       <h1>Carte</h1>
       <span class="muted" data-map-count></span>

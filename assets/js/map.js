@@ -29,10 +29,54 @@
   var count = $('[data-map-count]');
   var coordsBox = $('[data-map-coords]');
 
+  // Colonne des joueurs repliable, état mémorisé dans le navigateur.
+  // Appliqué avant la création de la carte pour qu'elle démarre directement à la bonne taille.
+  var layout = el.closest('.map-layout');
+  var PANEL_KEY = 'mcstats.mapPanelCollapsed';
+  try {
+    if (localStorage.getItem(PANEL_KEY) === '1') layout.classList.add('is-collapsed');
+  } catch (e) {}
+
   // Repère identique à Pl3xMap : axe Z vers le bas, 1 pixel = 1 bloc au zoom natif
   var crs = L.extend({}, L.CRS.Simple, { transformation: new L.Transformation(1, 0, 1, 0) });
-  var map = L.map(el, { crs: crs, center: [0, 0], zoom: 0, zoomSnap: 1, zoomDelta: 1, attributionControl: true });
+  var map = L.map(el, { crs: crs, center: [0, 0], zoom: 0, zoomSnap: 1, zoomDelta: 1, attributionControl: true, zoomControl: false });
   map.attributionControl.setPrefix('<a href="https://modrinth.com/plugin/pl3xmap" target="_blank" rel="noopener">Pl3xMap</a> · <a href="https://leafletjs.com" target="_blank" rel="noopener">Leaflet</a>');
+
+  var ICON_HIDE = '<svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path d="M10 3 5 8l5 5M13 3v10" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  var ICON_SHOW = '<svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path d="m6 3 5 5-5 5M3 3v10" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  var panelButton = null;
+
+  function setPanelCollapsed(collapsed) {
+    layout.classList.toggle('is-collapsed', collapsed);
+    if (panelButton) {
+      var label = collapsed ? 'Afficher la liste des joueurs' : 'Masquer la liste des joueurs';
+      panelButton.innerHTML = collapsed ? ICON_SHOW : ICON_HIDE;
+      panelButton.title = label;
+      panelButton.setAttribute('aria-label', label);
+      panelButton.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+    }
+    // la carte change de taille : Leaflet recalcule en gardant le même centre
+    map.invalidateSize();
+    try { localStorage.setItem(PANEL_KEY, collapsed ? '1' : '0'); } catch (e) {}
+  }
+
+  var PanelToggle = L.Control.extend({
+    options: { position: 'topleft' },
+    onAdd: function () {
+      var bar = L.DomUtil.create('div', 'leaflet-bar');
+      panelButton = L.DomUtil.create('button', 'map-panel-toggle', bar);
+      panelButton.type = 'button';
+      panelButton.setAttribute('aria-controls', 'map-panel');
+      L.DomEvent.disableClickPropagation(bar);
+      L.DomEvent.on(panelButton, 'click', function () {
+        setPanelCollapsed(!layout.classList.contains('is-collapsed'));
+      });
+      return bar;
+    }
+  });
+  new PanelToggle().addTo(map);
+  L.control.zoom({ zoomInTitle: 'Zoomer', zoomOutTitle: 'Dézoomer' }).addTo(map);
+  setPanelCollapsed(layout.classList.contains('is-collapsed'));
 
   function scale() { return 1 / Math.pow(2, current.maxOut); }
   function toLatLng(x, z) { return L.latLng(z * scale(), x * scale()); }
