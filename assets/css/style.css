@@ -706,7 +706,39 @@ textarea.input { height: auto; min-height: 84px; padding: 10px 12px; line-height
 .admin-accounts { margin-top: 32px; }
 .accounts-table td { vertical-align: middle; }
 .accounts-table .player-link { margin-right: 6px; }
-.accounts-table__actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.accounts-table__actions { vertical-align: top; text-align: right; }
+
+/* Menu « Actions » d'un compte */
+.menu { display: inline-block; text-align: left; }
+.menu__button {
+  display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px; border-radius: 8px;
+  background: var(--surface-2); border: 1px solid var(--border); color: var(--text-2);
+  font-size: 13px; font-weight: 600; white-space: nowrap; cursor: pointer; list-style: none;
+}
+.menu__button::-webkit-details-marker { display: none; }
+.menu__button:hover, .menu[open] > .menu__button { border-color: var(--border-strong); color: var(--text); }
+.menu__chevron {
+  width: 7px; height: 7px; margin-top: -3px; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor;
+  transform: rotate(45deg); transition: transform .15s;
+}
+.menu[open] .menu__chevron { margin-top: 2px; transform: rotate(-135deg); }
+.menu__list {
+  display: flex; flex-direction: column; gap: 2px; min-width: 216px; margin-top: 6px; padding: 6px;
+  background: var(--surface-2); border: 1px solid var(--border); border-radius: 10px; box-shadow: var(--shadow);
+}
+.menu__item {
+  display: flex; align-items: center; gap: 8px; width: 100%; padding: 7px 8px; border: 0; border-radius: 8px;
+  background: none; color: var(--text-2); font: inherit; font-size: 13px; font-weight: 600; text-align: left; cursor: pointer;
+}
+.menu__item:hover, .menu__item:focus-visible { background: var(--surface-3); color: var(--text); }
+.menu__item .mc-icon { width: 18px; height: 18px; }
+.menu__item--danger { color: #ff8a8d; }
+.menu__item--danger:hover, .menu__item--danger:focus-visible { background: rgba(229, 72, 77, .14); }
+.menu__sep { display: block; height: 1px; margin: 4px 8px; background: var(--border); }
+.page-head__link { margin-left: 12px; font-weight: 600; }
+.event-kind { white-space: nowrap; }
+.event-kind .mc-icon { width: 18px; height: 18px; margin-right: 6px; }
+.log-detail { max-width: 520px; overflow-wrap: anywhere; }
 .accounts-table tr.is-flagged td { background: rgba(229, 72, 77, .06); }
 .flag {
   display: flex; flex-direction: column; gap: 2px; margin-top: 8px; padding: 8px 10px;

@@ -384,6 +384,32 @@
         if (!window.confirm(form.getAttribute('data-confirm'))) e.preventDefault();
       });
     });
+    // Motif demandé avant l'envoi (expulsion, bannissement) : annuler abandonne l'action
+    $$('form[data-prompt]').forEach(function (form) {
+      form.addEventListener('submit', function (e) {
+        var reason = window.prompt(form.getAttribute('data-prompt'), '');
+        if (reason === null) { e.preventDefault(); return; }
+        var field = $('input[name="reason"]', form);
+        if (field) field.value = reason;
+      });
+    });
+  }
+
+  /* ------------------------------------------------- Menus « Actions » (admin) */
+  function initMenus() {
+    var menus = $$('details.menu');
+    if (!menus.length) return;
+    menus.forEach(function (m) {
+      m.addEventListener('toggle', function () {
+        if (m.open) menus.forEach(function (o) { if (o !== m) o.open = false; });
+      });
+    });
+    document.addEventListener('click', function (e) {
+      menus.forEach(function (m) { if (m.open && !m.contains(e.target)) m.open = false; });
+    });
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') menus.forEach(function (m) { m.open = false; });
+    });
   }
 
   function init() {
@@ -394,6 +420,7 @@
     initCopy();
     initFilters();
     initForms();
+    initMenus();
     initCharts();
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);

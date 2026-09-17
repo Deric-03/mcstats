@@ -4,7 +4,7 @@
  */
 final class Db
 {
-    const SCHEMA_VERSION = 5;
+    const SCHEMA_VERSION = 6;
 
     /** Colonnes ajoutées après la première version (ajoutées automatiquement si absentes). */
     const EXTRA_COLUMNS = [
@@ -184,6 +184,46 @@ final class Db
             created_at BIGINT NOT NULL DEFAULT 0,
             decided_at BIGINT NOT NULL DEFAULT 0
         )" . $suffix);
+
+        // Journal : actions faites depuis le site, et périodes de connexion des joueurs
+        $pdo->exec("CREATE TABLE IF NOT EXISTS admin_log (
+            $id,
+            account_id INT NOT NULL DEFAULT 0,
+            username VARCHAR(40) NOT NULL DEFAULT '',
+            username_lc VARCHAR(40) NOT NULL DEFAULT '',
+            uuid VARCHAR(36) NOT NULL DEFAULT '',
+            actor VARCHAR(40) NOT NULL DEFAULT '',
+            action VARCHAR(20) NOT NULL DEFAULT '',
+            detail VARCHAR(500) NOT NULL DEFAULT '',
+            created_at BIGINT NOT NULL DEFAULT 0
+        )" . $suffix);
+
+        $pdo->exec('CREATE TABLE IF NOT EXISTS player_sessions (
+            uuid CHAR(36) NOT NULL,
+            started_at BIGINT NOT NULL DEFAULT 0,
+            ended_at BIGINT NOT NULL DEFAULT 0,
+            PRIMARY KEY (uuid, started_at)
+        )' . $suffix);
+
+        // Événements lus dans le journal du serveur (morts, connexions, chat…)
+        $pdo->exec("CREATE TABLE IF NOT EXISTS server_events (
+            $id,
+            sig CHAR(32) NOT NULL UNIQUE,
+            at BIGINT NOT NULL DEFAULT 0,
+            kind VARCHAR(16) NOT NULL DEFAULT '',
+            player VARCHAR(40) NOT NULL DEFAULT '',
+            player_lc VARCHAR(40) NOT NULL DEFAULT '',
+            message VARCHAR(500) NOT NULL DEFAULT ''
+        )" . $suffix);
+        foreach (['CREATE INDEX IF NOT EXISTS idx_events_player ON server_events (player_lc, at)',
+                  'CREATE INDEX IF NOT EXISTS idx_events_at ON server_events (at)',
+                  'CREATE INDEX IF NOT EXISTS idx_log_account ON admin_log (account_id)'] as $sql) {
+            try {
+                $pdo->exec($sql);
+            } catch (PDOException $e) {
+                // MySQL < 8 ne connaît pas IF NOT EXISTS sur les index : l'index existe déjà
+            }
+        }
 
         // Données de plugins par joueur (sac à dos, homes), en JSON
         $pdo->exec('CREATE TABLE IF NOT EXISTS plugin_data (

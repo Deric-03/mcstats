@@ -366,13 +366,40 @@ positions et les inventaires sont alors réservés aux joueurs connectés ; le r
 
 Le lien « Admin » de l'en-tête affiche le nombre de demandes et de signalements à traiter. Pour chaque demande : édition,
 message du joueur, indication « Déjà whitelisté » et « A déjà joué sur le serveur », boutons Valider /
-Refuser. Pour les comptes : nouveau mot de passe provisoire (mot de passe oublié : le joueur devra le
-changer à sa prochaine connexion), désactivation, suppression. Désactiver ou supprimer un compte ne retire
-pas le joueur de la whitelist du serveur.
+Refuser.
 
-« Rendre admin » (comptes actifs) et « Retirer admin » : tout admin peut nommer ou retirer d'autres admins,
-mais pas se retirer ses propres droits, pour qu'il reste toujours au moins un admin. Ce sont des droits sur
-le site uniquement : le joueur ne devient pas opérateur du serveur Minecraft.
+Chaque compte de la liste a un menu **« Actions »** :
+
+| Action | Effet |
+|--------|-------|
+| Nouveau mot de passe | Mot de passe provisoire à transmettre au joueur, qui devra le changer à sa prochaine connexion. |
+| Désactiver / Réactiver le compte | Coupe ou rend l'accès au site. La whitelist du serveur n'est pas touchée. |
+| Rendre admin / Retirer les droits admin | Droits sur le site uniquement : le joueur ne devient pas opérateur du serveur Minecraft. |
+| Expulser du serveur | Déconnecte le joueur s'il est en ligne (RCON). |
+| Bannir du serveur / Lever le bannissement | Bannit sur le serveur (RCON) et désactive le compte du site. |
+| Supprimer le compte | Efface le compte du site. Le joueur reste dans la whitelist du serveur. |
+
+Tout admin peut nommer ou retirer d'autres admins, mais pas se retirer ses propres droits, pour qu'il reste
+toujours au moins un admin. De même, on ne peut ni s'expulser, ni se bannir, ni se supprimer soi-même.
+
+### Expulser et bannir
+
+Ces deux actions demandent RCON (voir plus haut). Avant l'envoi, le site demande un **motif**, facultatif,
+qui est montré au joueur par le serveur ; annuler la fenêtre annule l'action. La réponse du serveur est
+affichée telle quelle (« Kicked … », « No player was found », « already banned »…).
+
+Un bannissement désactive aussi le compte du site et ferme ses sessions ; une étiquette « Banni » apparaît
+dans la liste tant que le joueur est dans la liste des bannis du serveur. « Lever le bannissement » ne
+réactive pas le compte du site : utilisez « Réactiver le compte ».
+
+Les commandes envoyées sont réglables dans `config.php`, section `accounts` (`{name}` = pseudo du joueur,
+préfixe Bedrock compris, `{reason}` = motif saisi) :
+
+```php
+'kick_command'  => 'kick {name} {reason}',
+'ban_command'   => 'ban {name} {reason}',
+'unban_command' => 'pardon {name}',
+```
 
 ### Signalement d'usurpation
 
@@ -453,6 +480,42 @@ L'espace admin indique en haut de page le nombre de joueurs lus pour chaque plug
 Seul le stockage SQLite de Minepacks est pris en charge (pas MySQL). Les sacs enregistrés dans un format
 trop ancien sont ignorés et comptés dans le journal de la synchronisation.
 
+## 14. Journal par joueur (admins)
+
+Chaque compte a un **journal**, atteint par « Voir le journal » dans son menu Actions ; « Journal du site »,
+en haut de l'espace admin, montre la même chose pour tout le monde. Il est réservé aux admins.
+
+Trois parties :
+
+1. **Actions du site** : demande de whitelist, signalement, validation, refus, mot de passe réinitialisé,
+   désactivation, droits admin, expulsion, bannissement, suppression… avec la date, l'auteur (l'admin, ou
+   « le joueur » quand c'est lui qui a agi) et le motif saisi.
+2. **Sur le serveur** : morts, connexions, déconnexions, chat, commandes et succès, lus dans le journal du
+   serveur Minecraft (voir ci-dessous). Un champ filtre la liste.
+3. **Périodes de connexion** : début, fin et durée de chaque passage sur le serveur, plus le total des
+   7 derniers jours. Elles sont construites par la synchronisation, sans lire les logs.
+
+### Lire le journal du serveur
+
+À chaque synchronisation, le site lit les **nouvelles lignes** de `logs/latest.log` (un curseur est gardé en
+base, le fichier est relu depuis le début après la rotation de minuit) et en tire les événements
+reconnaissables. Les lignes techniques (connexion avec l'adresse IP, messages des plugins…) sont ignorées,
+et rien n'est relu deux fois.
+
+```php
+'server_log' => [
+    'path'      => '/opt/minecraft/logs/latest.log',
+    'keep_days' => 90,    // les événements plus vieux sont effacés
+    'chat'      => true,  // false : ne pas enregistrer les messages du chat
+],
+```
+
+- Le journal démarre à la mise en place : il ne remonte pas dans le passé.
+- Le fichier est lu par la synchronisation, donc sous le compte du serveur Minecraft (étape 5).
+- `'chat' => false` si vous préférez ne pas conserver les conversations des joueurs.
+- Les messages de mort sont gardés tels que le serveur les écrit (« … was slain by Zombie »), donc en
+  anglais si le serveur est en anglais.
+
 ## Dépannage
 
 | Symptôme | Solution |
@@ -468,6 +531,7 @@ trop ancien sont ignorés et comptés dans le journal de la synchronisation.
 | « La carte n'est pas encore disponible » | Vérifier `'map' => ['enabled' => true]` dans `config.php`, et que Pl3xMap a bien créé `map/tiles/settings.json` (étape 11). |
 | « Connecte-toi pour voir la carte » alors qu'on veut une carte publique | Les comptes sont activés : la carte est réservée aux joueurs connectés. Mettre `'accounts' => ['enabled' => false]` pour tout rendre public. |
 | La validation d'une demande échoue (« connexion RCON impossible ») | Le serveur Minecraft doit être allumé, avec `enable-rcon=true` et le même mot de passe que `server.rcon_password`. |
+| Journal « Sur le serveur » vide | Vérifier `server_log.path` dans `config.php`, puis le message d'erreur en haut de l'espace admin. Le journal ne se remplit qu'à partir de sa mise en place. |
 | Pas de sac à dos ni de homes sur un profil | Ils n'apparaissent qu'au joueur sur son propre profil et aux admins. Vérifier la section `plugins` de `config.php`, puis l'état des plugins en haut de l'espace admin. |
 | « l'extension PHP SQLite est absente » dans l'espace admin | `sudo apt install php-sqlite3` ; la synchronisation suivante lira Minepacks. |
 | Carte grise ou trouée | Le rendu n'est pas terminé (`map status` dans la console), ou Apache ne peut pas lire les images : vérifier avec `ls -l /var/www/html/mcstats/map/tiles`. |

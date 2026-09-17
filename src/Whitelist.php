@@ -149,6 +149,7 @@ final class Whitelist
             );
         }
         $account = Db::one('SELECT * FROM accounts WHERE username_lc = ?', [mb_strtolower($username)]);
+        Journal::log('request', $account, '', $message);
         return ['ok' => true, 'error' => null, 'account' => $account, 'verified' => $verified];
     }
 
@@ -183,6 +184,7 @@ final class Whitelist
             "INSERT INTO identity_reports (account_id, discord, message, ip, status, created_at) VALUES (?, ?, ?, ?, 'open', ?)",
             [$acc['id'], $discord, $message, Auth::ip(), time()]
         );
+        Journal::log('report', Db::one('SELECT * FROM accounts WHERE id = ?', [$acc['id']]) ?: [], '', "Discord : $discord" . ($message !== '' ? " — $message" : ''));
         return ['ok' => true, 'error' => null];
     }
 
@@ -263,6 +265,89 @@ final class Whitelist
     }
 
     /** Pseudos déjà présents dans la whitelist du serveur (en minuscules), ou null si RCON indisponible. */
+    /** Commande serveur pour un compte : {name} = pseudo exact (préfixe Bedrock compris), {reason} = motif. */
+    private static function serverCommand(string $key, string $default, array $account, string $reason = ''): string
+    {
+        $cmd = strtr((string) App::cfg("accounts.$key", $default), ['{name}' => $account['username'], '{reason}' => $reason]);
+        return trim((string) preg_replace('/\s+/u', ' ', $cmd));
+    }
+
+    /** Motif saisi par l'admin, ramené à une ligne sans guillemets. */
+    public static function cleanReason(string $reason): string
+    {
+        $reason = str_replace(['"', "\n", "\r"], ' ', $reason);
+        return mb_substr(trim((string) preg_replace('/\s+/u', ' ', $reason)), 0, 120);
+    }
+
+    /** Envoie une commande de modération et interprète la réponse du serveur. */
+    private static function moderate(int $id, string $key, string $default, string $reason, string $done): array
+    {
+        $acc = Db::one('SELECT * FROM accounts WHERE id = ?', [$id]);
+        if (!$acc) {
+            return ['ok' => false, 'message' => 'Compte introuvable.'];
+        }
+        $command = self::serverCommand($key, $default, $acc, self::cleanReason($reason));
+        if (!Rcon::configured()) {
+            return ['ok' => false, 'message' => "RCON n'est pas configuré : tape « $command » dans la console du serveur."];
+        }
+        try {
+            $reply = Rcon::command($command);
+        } catch (Throwable $e) {
+            return ['ok' => false, 'message' => "« $command » n'a pas pu être envoyé : " . $e->getMessage() . '.'];
+        }
+        if (preg_match('/(no player|not found|introuvable|error|erreur|usage:)/i', $reply)) {
+            return ['ok' => false, 'message' => "Le serveur a refusé « $command » : $reply"];
+        }
+        return [
+            'ok' => true,
+            'account' => $acc,
+            'message' => str_replace('{name}', $acc['username'], $done) . ' Réponse du serveur : ' . ($reply !== '' ? $reply : '(aucune)'),
+        ];
+    }
+
+    /** Expulse le joueur du serveur (il peut revenir). */
+    public static function kick(int $id, string $reason = ''): array
+    {
+        return self::moderate($id, 'kick_command', 'kick {name} {reason}', $reason, '{name} est expulsé du serveur.');
+    }
+
+    /** Bannit le joueur du serveur et désactive son compte sur le site. */
+    public static function ban(int $id, string $reason = ''): array
+    {
+        $r = self::moderate($id, 'ban_command', 'ban {name} {reason}', $reason, '{name} est banni du serveur et son compte du site est désactivé.');
+        if ($r['ok']) {
+            Db::exec("UPDATE accounts SET status = 'disabled' WHERE id = ?", [$id]);
+            Auth::dropSessions($id);
+        }
+        return $r;
+    }
+
+    /** Lève le bannissement ; le compte du site reste désactivé (bouton « Réactiver »). */
+    public static function unban(int $id): array
+    {
+        return self::moderate($id, 'unban_command', 'pardon {name}', '', "{name} n'est plus banni du serveur.");
+    }
+
+    /** Pseudos bannis sur le serveur (minuscules), null si RCON ne répond pas. */
+    public static function serverBans(): ?array
+    {
+        if (!Rcon::configured()) {
+            return null;
+        }
+        try {
+            $reply = Rcon::command('banlist players');
+        } catch (Throwable $e) {
+            return null;
+        }
+        $names = [];
+        foreach (preg_split('/\R/', $reply) ?: [] as $line) {
+            if (preg_match('/^\s*(\S{1,32})\s+(?:was banned by|a été banni)/iu', $line, $m)) {
+                $names[mb_strtolower($m[1])] = true;
+            }
+        }
+        return $names;
+    }
+
     public static function serverWhitelist(): ?array
     {
         if (!Rcon::configured()) {

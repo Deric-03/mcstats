@@ -264,6 +264,9 @@ final class Sync
         // Plugins (sac à dos, homes) : en dehors de la transaction principale
         Plugins::sync($force, $log);
 
+        // Journal du serveur (morts, connexions, chat…)
+        ServerLog::sync($log);
+
         // Skins : en dehors de la transaction (requêtes réseau)
         $skins = self::updateSkins($cli, $now);
 
@@ -291,8 +294,10 @@ final class Sync
      */
     private static function updateOnline(?array $status, int $now): int
     {
+        $before = array_column(Db::all('SELECT uuid FROM players WHERE online = 1'), 'uuid');
         if (!$status || empty($status['enabled']) || empty($status['online'])) {
             Db::exec('UPDATE players SET online = 0, online_since = 0, last_seen = ? WHERE online = 1', [$now]);
+            self::logSessions($before, [], $now);
             return 0;
         }
         $ids = [];
@@ -315,7 +320,20 @@ final class Sync
             }
         }
         Db::exec('UPDATE players SET last_seen = ? WHERE online = 1', [$now]);
+        self::logSessions($before, array_column(Db::all('SELECT uuid FROM players WHERE online = 1'), 'uuid'), $now);
         return (int) Db::value('SELECT COUNT(*) FROM players WHERE online = 1 AND hidden = 0');
+    }
+
+    /** Journal des connexions : ouvre et ferme une période pour chaque changement d'état. */
+    private static function logSessions(array $before, array $after, int $now): void
+    {
+        foreach (array_diff($after, $before) as $uuid) {
+            Journal::openSession($uuid, $now);
+        }
+        foreach (array_diff($before, $after) as $uuid) {
+            Journal::closeSession($uuid, $now);
+        }
+        Journal::cleanup($now);
     }
 
     /** Détecte la structure des dossiers (récente "players/…" ou ancienne "playerdata/…"). */

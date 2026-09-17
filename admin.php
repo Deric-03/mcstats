@@ -33,7 +33,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         [$flashOk, $flash] = [false, 'La page a expiré : réessaie.'];
     } elseif (!$target) {
         [$flashOk, $flash] = [false, 'Compte introuvable.'];
-    } elseif ((int) $target['id'] === (int) $me['id'] && in_array($action, ['disable', 'delete', 'refuse', 'revoke', 'demote'], true)) {
+    } elseif ((int) $target['id'] === (int) $me['id'] && in_array($action, ['disable', 'delete', 'refuse', 'revoke', 'demote', 'kick', 'ban'], true)) {
         [$flashOk, $flash] = [false, 'Tu ne peux pas faire ça sur ton propre compte.'];
     } else {
         switch ($action) {
@@ -43,6 +43,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 break;
             case 'refuse':
                 $r = Whitelist::refuse($id);
+                [$flashOk, $flash] = [$r['ok'], $r['message']];
+                break;
+            case 'kick':
+                $r = Whitelist::kick($id, (string) ($_POST['reason'] ?? ''));
+                [$flashOk, $flash] = [$r['ok'], $r['message']];
+                break;
+            case 'ban':
+                $r = Whitelist::ban($id, (string) ($_POST['reason'] ?? ''));
+                [$flashOk, $flash] = [$r['ok'], $r['message']];
+                break;
+            case 'unban':
+                $r = Whitelist::unban($id);
                 [$flashOk, $flash] = [$r['ok'], $r['message']];
                 break;
             case 'reset':
@@ -89,7 +101,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             default:
                 [$flashOk, $flash] = [false, 'Action inconnue.'];
         }
+        if ($flashOk && isset(Journal::LABELS[$action])) {
+            $reason = in_array($action, ['kick', 'ban'], true) ? Whitelist::cleanReason((string) ($_POST['reason'] ?? '')) : '';
+            Journal::log($action, $target, (string) $me['username'], $reason);
+        }
     }
+}
+
+// ------------------------------------------------------------------ Journal (actions, serveur, connexions)
+if (isset($_GET['log'])) {
+    require APP_ROOT . '/src/admin_log.php';
+    exit;
 }
 
 // ------------------------------------------------------------------ Données
@@ -120,19 +142,43 @@ $hasPlayed = function (array $a) use ($played) {
     return ($a['uuid'] !== '' && isset($played[$a['uuid']])) || isset($played['name:' . $a['username_lc']]);
 };
 $rconState = Rcon::configured() ? ($pending && $serverWhitelist === null ? 'erreur' : 'actif') : 'off';
-$actionForm = function (array $a, string $action, string $label, string $cls, string $confirm = '') {
-    return '<form method="post" action="admin.php"' . ($confirm !== '' ? ' data-confirm="' . h($confirm) . '"' : '') . '>'
+$serverBans = Rcon::configured() ? Whitelist::serverBans() : null;
+$isBanned = function (array $a) use ($serverBans) {
+    return $serverBans !== null && isset($serverBans[$a['username_lc']]);
+};
+
+/**
+ * Formulaire d'une action sur un compte.
+ * $opts : cls (classes du bouton), confirm (confirmation), prompt (motif demandé), icon (icône Minecraft).
+ */
+$actionForm = function (array $a, string $action, string $label, array $opts = []) {
+    $prompt = (string) ($opts['prompt'] ?? '');
+    $confirm = (string) ($opts['confirm'] ?? '');
+    $icon = (string) ($opts['icon'] ?? '');
+    return '<form method="post" action="admin.php"'
+        . ($confirm !== '' ? ' data-confirm="' . h($confirm) . '"' : '')
+        . ($prompt !== '' ? ' data-prompt="' . h($prompt) . '"' : '') . '>'
         . Auth::csrfField()
         . '<input type="hidden" name="id" value="' . (int) $a['id'] . '">'
         . '<input type="hidden" name="action" value="' . h($action) . '">'
-        . '<button class="btn btn--sm ' . h($cls) . '" type="submit">' . h($label) . '</button></form>';
+        . ($prompt !== '' ? '<input type="hidden" name="reason" value="">' : '')
+        . '<button class="' . h((string) ($opts['cls'] ?? 'btn btn--sm')) . '" type="submit">'
+        . ($icon !== '' ? mc_icon($icon) : '') . h($label) . '</button></form>';
 };
+
+/** Une entrée du menu « Actions » d'un compte. */
+$menuItem = function (array $a, string $action, string $label, string $icon, array $opts = []) use ($actionForm) {
+    $opts['icon'] = $icon;
+    $opts['cls'] = 'menu__item' . (empty($opts['danger']) ? '' : ' menu__item--danger');
+    return $actionForm($a, $action, $label, $opts);
+};
+$menuSep = '<span class="menu__sep"></span>';
 
 require APP_ROOT . '/templates/header.php';
 ?>
 <div class="auth-wrap auth-wrap--wide">
   <div class="page-head">
-    <h1>Administration</h1>
+    <h1>Administration <a class="link-more page-head__link" href="admin.php?log=all">Journal du site →</a></h1>
     <p class="muted">
       <?php if ($rconState === 'actif'): ?>RCON actif : les joueurs validés sont ajoutés automatiquement à la whitelist.
       <?php elseif ($rconState === 'erreur'): ?><span class="text-danger">RCON configuré mais le serveur ne répond pas</span> : la validation échouera tant que le serveur Minecraft est éteint ou que RCON est désactivé.
@@ -156,6 +202,9 @@ require APP_ROOT . '/templates/header.php';
       }
       echo implode(' · ', $parts); ?>
     </p>
+    <?php endif; ?>
+    <?php $logInfo = ServerLog::status(); if (ServerLog::enabled() && !empty($logInfo['error'])): ?>
+    <p class="muted">Journal du serveur : <span class="text-danger"><?= h($logInfo['error']) ?></span></p>
     <?php endif; ?>
   </div>
 
@@ -185,9 +234,9 @@ require APP_ROOT . '/templates/header.php';
       <?php if ($a['message'] !== ''): ?><blockquote class="request__message"><?= nl2br(h($a['message'])) ?></blockquote><?php endif; ?>
       <?= $reportDetails($a) ?>
       <div class="request__actions">
-        <?= $actionForm($a, 'approve', 'Valider', 'btn--primary') ?>
-        <?= $actionForm($a, 'refuse', 'Refuser', 'btn--danger', "Refuser la demande de {$a['username']} ?") ?>
-        <?php if (isset($reports[(int) $a['id']])): ?><?= $actionForm($a, 'dismiss', 'Ignorer le signalement', 'btn--ghost') ?><?php endif; ?>
+        <?= $actionForm($a, 'approve', 'Valider', ['cls' => 'btn btn--sm btn--primary']) ?>
+        <?= $actionForm($a, 'refuse', 'Refuser', ['cls' => 'btn btn--sm btn--danger', 'confirm' => "Refuser la demande de {$a['username']} ?"]) ?>
+        <?php if (isset($reports[(int) $a['id']])): ?><?= $actionForm($a, 'dismiss', 'Ignorer le signalement', ['cls' => 'btn btn--sm btn--ghost']) ?><?php endif; ?>
         <span class="muted request__cmd">Commande : <code><?= h(Whitelist::commandFor($a)) ?></code></span>
       </div>
     </article>
@@ -208,27 +257,48 @@ require APP_ROOT . '/templates/header.php';
             <td><span class="player-link"><?= head_img($a['uuid'] !== '' ? $a['uuid'] : $a['username'], 24) ?><span><?= h($a['username']) ?></span></span>
               <span class="tag"><?= $a['edition'] === 'bedrock' ? 'Bedrock' : 'Java' ?></span><?php if (!empty($a['is_admin'])): ?> <span class="tag tag--ok">Admin</span><?php endif; ?>
               <?= $reportDetails($a) ?></td>
-            <td><?= account_status_tag($a['status']) ?><?php if ($flagged): ?> <span class="tag tag--danger">Révocation demandée</span><?php endif; ?></td>
+            <td><?= account_status_tag($a['status']) ?><?php if ($isBanned($a)): ?> <span class="tag tag--danger" title="Banni du serveur Minecraft">Banni</span><?php endif; ?><?php if ($flagged): ?> <span class="tag tag--danger">Révocation demandée</span><?php endif; ?></td>
             <td class="hide-md muted"><?= h(fmt_date($a['decided_at'] ?: $a['created_at'])) ?></td>
             <td class="hide-md muted"><?= h($a['last_login'] ? fmt_ago($a['last_login']) : 'jamais') ?></td>
             <td class="accounts-table__actions">
-              <?php if ($flagged && !$self): ?>
-                <?= $actionForm($a, 'revoke', 'Révoquer', 'btn--danger', "Révoquer le compte de {$a['username']} ? Il sera supprimé et le vrai joueur pourra refaire sa demande. La whitelist du serveur n'est pas modifiée.") ?>
-                <?= $actionForm($a, 'dismiss', 'Ignorer le signalement', 'btn--ghost') ?>
-              <?php endif; ?>
-              <?php if ($a['status'] === 'refused'): ?>
-                <?= $actionForm($a, 'approve', 'Valider', 'btn--ghost') ?>
-              <?php else: ?>
-                <?= $actionForm($a, 'reset', 'Nouveau mot de passe', 'btn--ghost', "Générer un mot de passe provisoire pour {$a['username']} ? Il sera déconnecté.") ?>
-                <?php if (!$self && $a['status'] === 'active'): ?><?= $actionForm($a, 'disable', 'Désactiver', 'btn--ghost', "Désactiver le compte de {$a['username']} ?") ?><?php endif; ?>
-                <?php if ($a['status'] === 'disabled'): ?><?= $actionForm($a, 'enable', 'Réactiver', 'btn--ghost') ?><?php endif; ?>
-              <?php endif; ?>
-              <?php if (!$self && !empty($a['is_admin'])): ?>
-                <?= $actionForm($a, 'demote', 'Retirer admin', 'btn--ghost', "Retirer les droits admin de {$a['username']} ?") ?>
-              <?php elseif (!$self && $a['status'] === 'active'): ?>
-                <?= $actionForm($a, 'promote', 'Rendre admin', 'btn--ghost', "Rendre {$a['username']} admin du site ? Il pourra valider les demandes, gérer les comptes et nommer d'autres admins. Il ne devient pas opérateur du serveur Minecraft.") ?>
-              <?php endif; ?>
-              <?php if (!$self): ?><?= $actionForm($a, 'delete', 'Supprimer', 'btn--danger', "Supprimer définitivement le compte de {$a['username']} ?") ?><?php endif; ?>
+              <details class="menu">
+                <summary class="menu__button">Actions<span class="menu__chevron" aria-hidden="true"></span></summary>
+                <div class="menu__list">
+                  <a class="menu__item" href="admin.php?log=<?= (int) $a['id'] ?>"><?= mc_icon('book') ?>Voir le journal</a>
+                  <?= $menuSep ?>
+                  <?php if ($flagged && !$self): ?>
+                    <?= $menuItem($a, 'revoke', 'Révoquer le compte', 'barrier', ['danger' => true, 'confirm' => "Révoquer le compte de {$a['username']} ? Il sera supprimé et le vrai joueur pourra refaire sa demande. La whitelist du serveur n'est pas modifiée."]) ?>
+                    <?= $menuItem($a, 'dismiss', 'Ignorer le signalement', 'writable_book') ?>
+                    <?= $menuSep ?>
+                  <?php endif; ?>
+                  <?php if ($a['status'] === 'refused'): ?>
+                    <?= $menuItem($a, 'approve', 'Valider la demande', 'lime_dye') ?>
+                  <?php else: ?>
+                    <?= $menuItem($a, 'reset', 'Nouveau mot de passe', 'tripwire_hook', ['confirm' => "Générer un mot de passe provisoire pour {$a['username']} ? Il sera déconnecté."]) ?>
+                    <?php if (!$self && $a['status'] === 'active'): ?><?= $menuItem($a, 'disable', 'Désactiver le compte', 'iron_door', ['confirm' => "Désactiver le compte de {$a['username']} ? Il ne pourra plus se connecter au site."]) ?><?php endif; ?>
+                    <?php if ($a['status'] === 'disabled'): ?><?= $menuItem($a, 'enable', 'Réactiver le compte', 'lime_dye') ?><?php endif; ?>
+                  <?php endif; ?>
+                  <?php if (!$self && !empty($a['is_admin'])): ?>
+                    <?= $menuItem($a, 'demote', 'Retirer les droits admin', 'iron_helmet', ['confirm' => "Retirer les droits admin de {$a['username']} ?"]) ?>
+                  <?php elseif (!$self && $a['status'] === 'active'): ?>
+                    <?= $menuItem($a, 'promote', 'Rendre admin du site', 'golden_helmet', ['confirm' => "Rendre {$a['username']} admin du site ? Il pourra valider les demandes, gérer les comptes et nommer d'autres admins. Il ne devient pas opérateur du serveur Minecraft."]) ?>
+                  <?php endif; ?>
+                  <?php if (!$self && Rcon::configured()): ?>
+                    <?= $menuSep ?>
+                    <?= $menuItem($a, 'kick', 'Expulser du serveur', 'leather_boots', ['prompt' => "Expulser {$a['username']} du serveur. Motif montré au joueur (facultatif) :"]) ?>
+                    <?php if ($isBanned($a)): ?>
+                      <?= $menuItem($a, 'unban', 'Lever le bannissement', 'totem_of_undying') ?>
+                    <?php else: ?>
+                      <?= $menuItem($a, 'ban', 'Bannir du serveur', 'barrier', ['danger' => true, 'prompt' => "Bannir {$a['username']} du serveur et désactiver son compte du site. Motif montré au joueur (facultatif) :"]) ?>
+                      <?php if ($serverBans === null): ?><?= $menuItem($a, 'unban', 'Lever le bannissement', 'totem_of_undying') ?><?php endif; ?>
+                    <?php endif; ?>
+                  <?php endif; ?>
+                  <?php if (!$self): ?>
+                    <?= $menuSep ?>
+                    <?= $menuItem($a, 'delete', 'Supprimer le compte', 'lava_bucket', ['danger' => true, 'confirm' => "Supprimer définitivement le compte de {$a['username']} ? Le joueur reste dans la whitelist du serveur."]) ?>
+                  <?php endif; ?>
+                </div>
+              </details>
             </td>
           </tr>
         <?php endforeach; ?>

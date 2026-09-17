@@ -98,6 +98,20 @@ return [
         // Commandes envoyées au serveur par RCON quand une demande est validée
         'whitelist_java'    => 'whitelist add {name}',
         'whitelist_bedrock' => 'fwhitelist add {gamertag}',
+        // Commandes de modération de l'espace admin ({name} = pseudo, {reason} = motif saisi par l'admin)
+        'kick_command'  => 'kick {name} {reason}',
+        'ban_command'   => 'ban {name} {reason}',
+        'unban_command' => 'pardon {name}',
+    ],
+
+    // ------------------------------------------------------------------
+    // Journal du serveur (voir README) : morts, connexions, chat, commandes et succès,
+    // lus dans logs/latest.log à chaque synchronisation. Réservé aux admins du site.
+    // ------------------------------------------------------------------
+    'server_log' => [
+        'path'      => '',   // ex. '/opt/minecraft/logs/latest.log' ('' = désactivé)
+        'keep_days' => 90,   // les événements plus vieux sont effacés
+        'chat'      => true, // false : ne pas enregistrer les messages du chat
     ],
 
     // ------------------------------------------------------------------
