@@ -376,12 +376,12 @@ Chaque compte de la liste a un menu **« Actions »** :
 | Action | Effet |
 |--------|-------|
 | Nouveau mot de passe | Mot de passe provisoire à transmettre au joueur, qui devra le changer à sa prochaine connexion. |
-| Désactiver / Réactiver le compte | Coupe ou rend l'accès au site. La whitelist du serveur n'est pas touchée. |
+| Désactiver / Réactiver le compte | Coupe ou rend l'accès au site, et retire le joueur de la whitelist du serveur ou l'y remet. |
 | Rendre admin / Retirer les droits admin | Droits sur le site uniquement : le joueur ne devient pas opérateur du serveur Minecraft. |
 | Expulser du serveur | Déconnecte le joueur s'il est en ligne (RCON). |
 | Bannir du serveur / Lever le bannissement | Bannit sur le serveur (RCON) et désactive le compte du site. |
 | Donner / Retirer le terminal | Ouvre ou ferme l'accès au terminal du serveur. Réservé à l'admin principal. |
-| Supprimer le compte | Efface le compte du site. Le joueur reste dans la whitelist du serveur. |
+| Supprimer le compte | Efface le compte du site et retire le joueur de la whitelist du serveur. |
 
 Tout admin peut nommer ou retirer d'autres admins, mais pas se retirer ses propres droits, pour qu'il reste
 toujours au moins un admin. De même, on ne peut ni s'expulser, ni se bannir, ni se supprimer soi-même.
@@ -432,9 +432,27 @@ Ces deux actions demandent RCON (voir plus haut). Avant l'envoi, le site demande
 qui est montré au joueur par le serveur ; annuler la fenêtre annule l'action. La réponse du serveur est
 affichée telle quelle (« Kicked … », « No player was found », « already banned »…).
 
-Un bannissement désactive aussi le compte du site et ferme ses sessions ; une étiquette « Banni » apparaît
-dans la liste tant que le joueur est dans la liste des bannis du serveur. « Lever le bannissement » ne
-réactive pas le compte du site : utilisez « Réactiver le compte ».
+Un bannissement désactive aussi le compte du site, ferme ses sessions et retire le joueur de la whitelist ;
+une étiquette « Banni » apparaît dans la liste tant que le joueur est dans la liste des bannis du serveur.
+« Lever le bannissement » ne réactive pas le compte du site : utilisez « Réactiver le compte », qui le remet
+aussi dans la whitelist.
+
+### La whitelist suit le compte
+
+Désactiver, bannir ou supprimer un compte retire le joueur de la whitelist du serveur ; le réactiver l'y
+remet. Pour Bedrock, la commande Floodgate reçoit le gamertag sans préfixe. Le résultat (réponse du serveur)
+est affiché et gardé au journal. Si le serveur est éteint ou que RCON ne répond pas, l'action a quand même
+lieu sur le site, le message passe en orange et donne la commande à taper à la main.
+
+La révocation d'un compte usurpé ne touche pas la whitelist : le pseudo appartient au vrai joueur, qui va
+refaire sa demande.
+
+Commandes réglables dans `config.php`, section `accounts` :
+
+```php
+'unwhitelist_java'    => 'whitelist remove {name}',
+'unwhitelist_bedrock' => 'fwhitelist remove {gamertag}',
+```
 
 Les commandes envoyées sont réglables dans `config.php`, section `accounts` (`{name}` = pseudo du joueur,
 préfixe Bedrock compris, `{reason}` = motif saisi) :

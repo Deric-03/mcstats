@@ -25,6 +25,7 @@ if (empty($me['is_admin'])) {
 // ------------------------------------------------------------------ Actions
 $flash = null;
 $flashOk = true;
+$flashWarn = false;   // action faite sur le site, mais la whitelist du serveur n'a pas suivi
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $id = (int) ($_POST['id'] ?? 0);
     $action = (string) ($_POST['action'] ?? '');
@@ -66,11 +67,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             case 'disable':
                 Db::exec("UPDATE accounts SET status = 'disabled' WHERE id = ?", [$id]);
                 Auth::dropSessions($id);
-                $flash = "Le compte de {$target['username']} est désactivé. Il reste dans la whitelist du serveur.";
+                $w = Whitelist::follow($target, false);
+                $flash = "Le compte de {$target['username']} est désactivé. " . $w['message'];
+                $flashWarn = !$w['ok'];
                 break;
             case 'enable':
                 Db::exec("UPDATE accounts SET status = 'active' WHERE id = ?", [$id]);
-                $flash = "Le compte de {$target['username']} est réactivé.";
+                $w = Whitelist::follow($target, true);
+                $flash = "Le compte de {$target['username']} est réactivé. " . $w['message'];
+                $flashWarn = !$w['ok'];
                 break;
             case 'console_on':
             case 'console_off':
@@ -110,13 +115,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 Db::exec('DELETE FROM auth_sessions WHERE account_id = ?', [$id]);
                 Db::exec('DELETE FROM accounts WHERE id = ?', [$id]);
                 Whitelist::closeReports($id, 'revoked');
-                $flash = "Le compte de {$target['username']} est supprimé. Il reste dans la whitelist du serveur.";
+                $w = Whitelist::follow($target, false);
+                $flash = "Le compte de {$target['username']} est supprimé. " . $w['message'];
+                $flashWarn = !$w['ok'];
                 break;
             default:
                 [$flashOk, $flash] = [false, 'Action inconnue.'];
         }
         if ($flashOk && isset(Journal::LABELS[$action])) {
             $reason = in_array($action, ['kick', 'ban'], true) ? Whitelist::cleanReason((string) ($_POST['reason'] ?? '')) : '';
+            if (isset($w)) {
+                $reason = trim($reason . ' ' . $w['message']);
+            }
             Journal::log($action, $target, (string) $me['username'], $reason);
         }
     }
@@ -232,7 +242,7 @@ require APP_ROOT . '/templates/header.php';
     </div>
   </div>
 
-  <?php if ($flash): ?><div class="alert <?= $flashOk ? 'alert--ok' : 'alert--error' ?>" role="status"><?= h($flash) ?></div><?php endif; ?>
+  <?php if ($flash): ?><div class="alert <?= !$flashOk ? 'alert--error' : ($flashWarn ? 'alert--warn' : 'alert--ok') ?>" role="status"><?= h($flash) ?></div><?php endif; ?>
 
   <section class="stack">
     <h2 class="h-section">Demandes de whitelist <span class="muted">(<?= count($pending) ?>)</span></h2>
@@ -306,7 +316,7 @@ require APP_ROOT . '/templates/header.php';
                     <?= $menuItem($a, 'approve', 'Valider la demande', 'lime_dye') ?>
                   <?php else: ?>
                     <?= $menuItem($a, 'reset', 'Nouveau mot de passe', 'tripwire_hook', ['confirm' => "Générer un mot de passe provisoire pour {$a['username']} ? Il sera déconnecté."]) ?>
-                    <?php if (!$self && $a['status'] === 'active'): ?><?= $menuItem($a, 'disable', 'Désactiver le compte', 'iron_door', ['confirm' => "Désactiver le compte de {$a['username']} ? Il ne pourra plus se connecter au site."]) ?><?php endif; ?>
+                    <?php if (!$self && $a['status'] === 'active'): ?><?= $menuItem($a, 'disable', 'Désactiver le compte', 'iron_door', ['confirm' => "Désactiver le compte de {$a['username']} ? Il ne pourra plus se connecter au site et sera retiré de la whitelist du serveur."]) ?><?php endif; ?>
                     <?php if ($a['status'] === 'disabled'): ?><?= $menuItem($a, 'enable', 'Réactiver le compte', 'lime_dye') ?><?php endif; ?>
                   <?php endif; ?>
                   <?php if (!$self && !empty($a['is_admin'])): ?>
@@ -333,7 +343,7 @@ require APP_ROOT . '/templates/header.php';
                   <?php endif; ?>
                   <?php if (!$self): ?>
                     <?= $menuSep ?>
-                    <?= $menuItem($a, 'delete', 'Supprimer le compte', 'lava_bucket', ['danger' => true, 'confirm' => "Supprimer définitivement le compte de {$a['username']} ? Le joueur reste dans la whitelist du serveur."]) ?>
+                    <?= $menuItem($a, 'delete', 'Supprimer le compte', 'lava_bucket', ['danger' => true, 'confirm' => "Supprimer définitivement le compte de {$a['username']} ? Il sera aussi retiré de la whitelist du serveur."]) ?>
                   <?php endif; ?>
                 </div>
               </details>

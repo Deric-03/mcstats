@@ -101,6 +101,9 @@ return [
         // Commandes envoyées au serveur par RCON quand une demande est validée
         'whitelist_java'    => 'whitelist add {name}',
         'whitelist_bedrock' => 'fwhitelist add {gamertag}',
+        // … et quand un compte est désactivé ou supprimé (réactiver le remet dans la whitelist)
+        'unwhitelist_java'    => 'whitelist remove {name}',
+        'unwhitelist_bedrock' => 'fwhitelist remove {gamertag}',
         // Durée de conservation du journal des actions du site (jours ; 0 = tout garder)
         'journal_keep_days' => 730,
         // Commandes de modération de l'espace admin ({name} = pseudo, {reason} = motif saisi par l'admin)

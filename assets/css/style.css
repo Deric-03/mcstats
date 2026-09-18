@@ -690,6 +690,7 @@ textarea.input { height: auto; min-height: 84px; padding: 10px 12px; line-height
 .alert--error { background: rgba(229, 72, 77, .1); border-color: rgba(229, 72, 77, .45); }
 .alert--ok { background: rgba(12, 163, 12, .1); border-color: rgba(12, 163, 12, .45); }
 .alert--info { background: rgba(57, 135, 229, .1); border-color: rgba(57, 135, 229, .45); }
+.alert--warn { background: rgba(240, 180, 60, .1); border-color: rgba(240, 180, 60, .45); }
 .logout { display: flex; justify-content: center; }
 
 .locked { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 32px 24px; text-align: center; }

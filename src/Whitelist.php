@@ -264,6 +264,41 @@ final class Whitelist
         return ['ok' => true, 'message' => "La demande de {$acc['username']} est refusée."];
     }
 
+    /** Commande qui retire un compte de la whitelist du serveur. */
+    public static function removeCommandFor(array $account): string
+    {
+        if ($account['edition'] === 'bedrock') {
+            $prefix = (string) App::cfg('accounts.bedrock_prefix', '.');
+            $gamertag = $prefix !== '' && strpos($account['username'], $prefix) === 0 ? substr($account['username'], strlen($prefix)) : $account['username'];
+            return strtr((string) App::cfg('accounts.unwhitelist_bedrock', 'fwhitelist remove {gamertag}'), ['{gamertag}' => $gamertag, '{name}' => $account['username']]);
+        }
+        return strtr((string) App::cfg('accounts.unwhitelist_java', 'whitelist remove {name}'), ['{name}' => $account['username']]);
+    }
+
+    /**
+     * Met la whitelist du serveur en accord avec le compte : ajout ($add) ou retrait.
+     * L'action sur le site a lieu dans tous les cas ; si le serveur ne répond pas, le message
+     * donne la commande à taper à la main.
+     * @return array ['ok' => bool, 'message' => string]
+     */
+    public static function follow(array $account, bool $add): array
+    {
+        $command = $add ? self::commandFor($account) : self::removeCommandFor($account);
+        if (!Rcon::configured()) {
+            return ['ok' => false, 'message' => "RCON n'est pas configuré : tape « $command » dans la console du serveur."];
+        }
+        try {
+            $reply = Rcon::command($command);
+        } catch (Throwable $e) {
+            return ['ok' => false, 'message' => "Whitelist non modifiée (" . $e->getMessage() . ") : tape « $command » dans la console du serveur."];
+        }
+        if (preg_match('/(does not exist|unknown|introuvable|error|erreur|usage)/i', $reply)) {
+            return ['ok' => false, 'message' => "Le serveur a refusé « $command » : $reply"];
+        }
+        return ['ok' => true, 'message' => ($add ? 'Ajouté à la whitelist du serveur' : 'Retiré de la whitelist du serveur')
+            . ($reply !== '' ? " ($reply)." : '.')];
+    }
+
     /** Pseudos déjà présents dans la whitelist du serveur (en minuscules), ou null si RCON indisponible. */
     /** Commande serveur pour un compte : {name} = pseudo exact (préfixe Bedrock compris), {reason} = motif. */
     private static function serverCommand(string $key, string $default, array $account, string $reason = ''): string
@@ -318,6 +353,7 @@ final class Whitelist
         if ($r['ok']) {
             Db::exec("UPDATE accounts SET status = 'disabled' WHERE id = ?", [$id]);
             Auth::dropSessions($id);
+            $r['message'] .= ' ' . self::follow($r['account'], false)['message'];
         }
         return $r;
     }
