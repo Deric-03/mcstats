@@ -1,23 +1,50 @@
-# MC Stats — statistiques des joueurs d'un serveur Minecraft
+# MC Stats — statistiques et espace admin pour serveur Minecraft
 
-Site PHP à héberger sous Apache (Ubuntu) qui affiche les statistiques des joueurs d'un serveur
-Minecraft Java, façon « tracker » :
+Site web à héberger soi-même (PHP + MariaDB, sans Docker) pour un serveur **Minecraft Java** :
+statistiques des joueurs façon « tracker », carte du monde, comptes joueurs avec demande de whitelist,
+et un espace admin relié au serveur par RCON. Interface en français.
 
-- **Accueil** : statut du serveur en direct (MOTD, joueurs connectés, version, latence), totaux du serveur,
-  top 5 dans plusieurs catégories, dernières connexions.
+## Fonctionnalités
+
+**Pour tous les visiteurs**
+
+- **Accueil** : statut du serveur en direct (MOTD, joueurs connectés, version, latence), totaux, top 5 par
+  catégorie, dernières connexions.
 - **Classements** : 20 catégories (score, temps de jeu, succès, mobs tués, K/D, blocs minés, diamants,
-  distance parcourue…) avec podium, rang et pagination.
-- **Profil joueur** : skin, statut « En ligne depuis … », rang dans chaque catégorie, faits marquants, graphiques de progression,
-  détails combat / minage / déplacements, les 126 succès avec leur date d'obtention,
-  inventaire et coffre de l'Ender (avec enchantements ; un clic sur un shulker ou un sac ouvre son
-  contenu), vie, faim, XP, position.
+  distance…) avec podium, rang et pagination.
+- **Profils** : skin, statut « En ligne depuis … », rang dans chaque catégorie, faits marquants, graphiques
+  de progression, combat / minage / déplacements, les 126 succès avec leur date d'obtention.
 - **Recherche** de joueur avec autocomplétion (pseudo ou UUID).
-- **Comptes joueurs** (optionnels) : demandes de whitelist, espace admin, badge « Vous » sur son propre
-  profil, et contenus privés (coffre de l'Ender, sac à dos, homes) réservés au joueur et aux admins.
 
-Les fichiers du serveur (`stats/`, `advancements/`, `data/`) sont lus **chaque minute** et stockés dans
-MariaDB : les visiteurs ne touchent jamais aux fichiers du serveur. Seuls les joueurs dont les fichiers ont
-changé sont relus.
+**Pour les joueurs connectés** (comptes optionnels)
+
+- **Demande de whitelist** depuis le site, pour Java comme pour Bedrock (Geyser / Floodgate) : la demande
+  crée le compte, la validation par un admin l'active et ajoute le joueur à la whitelist.
+- **Carte du monde** ([Pl3xMap](https://modrinth.com/plugin/pl3xmap)) avec la position des joueurs en direct
+  et leurs homes.
+- **Inventaire, coffre de l'Ender, sac à dos** (Minepacks) et **homes** (UltimateHomes, EssentialsX) ; un
+  clic sur un shulker ouvre son contenu. Les contenus privés ne sont visibles que par le joueur et les admins.
+
+**Pour les admins**
+
+- Validation des demandes ; la **whitelist du serveur suit les comptes** (validation, désactivation,
+  suppression, bannissement) via RCON.
+- **Menu d'actions** par compte : mot de passe provisoire, désactivation, droits admin, expulsion,
+  bannissement avec motif.
+- **Journal par joueur** : actions faites sur le site, périodes de connexion, et événements lus dans les logs
+  du serveur — **morts** (cause, tueur, lieu avec lien vers la carte), chat, commandes, succès.
+- **Terminal** du serveur (RCON), réservé à l'admin principal qui peut l'ouvrir à d'autres admins ; tout est
+  journalisé.
+- **Admin principal** protégé des autres admins, **signalement d'usurpation** de pseudo.
+
+## En bref
+
+- PHP 8.1+ sous Apache, MariaDB (ou SQLite), une tâche cron chaque minute.
+- La synchronisation lit les fichiers du serveur (`stats/`, `advancements/`, `data/`, plugins, logs) et les
+  range en base : les visiteurs ne touchent jamais aux fichiers du serveur. Seuls les fichiers qui ont
+  changé sont relus.
+- Aucun plugin n'est obligatoire : chaque plugin compatible ajoute ses fonctions s'il est installé.
+- Site non officiel, non affilié à Mojang ou Microsoft.
 
 ### Versions de Minecraft compatibles
 
@@ -70,7 +97,7 @@ ci-dessous `minecraft`, à remplacer par le vôtre). Apache n'a besoin que de li
 
 ```bash
 sudo install -d -o minecraft -g www-data -m 2775 /var/www/html/mcstats
-sudo -u minecraft git clone https://git.nascedric.fr/Cedric/mcstats.git /var/www/html/mcstats
+sudo -u minecraft git clone https://github.com/Deric-03/mcstats.git /var/www/html/mcstats
 cd /var/www/html/mcstats
 sudo install -d -o minecraft -g www-data -m 2775 data map
 sudo -u minecraft cp config.sample.php config.php
