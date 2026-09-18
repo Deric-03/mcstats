@@ -37,6 +37,18 @@ et un espace admin relié au serveur par RCON. Interface en français.
   journalisé.
 - **Admin principal** protégé des autres admins, **signalement d'usurpation** de pseudo.
 
+## Captures
+
+![Carte du monde : Pl3xMap avec les joueurs connectés et les homes](docs/captures/carte.jpg)
+
+| Accueil | Classements |
+|:---:|:---:|
+| ![Accueil : statut du serveur, totaux et meilleurs joueurs](docs/captures/accueil.png) | ![Classements par catégorie, avec podium](docs/captures/classements.png) |
+| **Profil d'un joueur** | **Inventaire, coffre de l'Ender et sac à dos** |
+| ![Profil : statistiques et rang dans chaque catégorie](docs/captures/profil.png) | ![Inventaire, coffre de l'Ender et sac à dos du joueur](docs/captures/inventaire.png) |
+| **Espace admin** | **Menu d'actions d'un compte** |
+| ![Espace admin : comptes, rôles, journal du site et terminal](docs/captures/admin.png) | ![Menu d'actions : journal, mot de passe, droits, expulsion, bannissement](docs/captures/admin-actions.png) |
+
 ## En bref
 
 - PHP 8.1+ sous Apache, MariaDB (ou SQLite), une tâche cron chaque minute.
