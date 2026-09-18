@@ -9,7 +9,8 @@ Minecraft Java, façon « tracker » :
   distance parcourue…) avec podium, rang et pagination.
 - **Profil joueur** : skin, statut « En ligne depuis … », rang dans chaque catégorie, faits marquants, graphiques de progression,
   détails combat / minage / déplacements, les 126 succès avec leur date d'obtention,
-  inventaire et coffre de l'Ender (avec enchantements et contenu des shulkers), vie, faim, XP, position.
+  inventaire et coffre de l'Ender (avec enchantements ; un clic sur un shulker ou un sac ouvre son
+  contenu), vie, faim, XP, position.
 - **Recherche** de joueur avec autocomplétion (pseudo ou UUID).
 - **Comptes joueurs** (optionnels) : demandes de whitelist, espace admin, badge « Vous » sur son propre
   profil, et contenus privés (coffre de l'Ender, sac à dos, homes) réservés au joueur et aux admins.

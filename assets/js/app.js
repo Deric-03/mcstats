@@ -220,6 +220,59 @@
     window.addEventListener('scroll', function () { if (current) hide(); }, { passive: true });
   }
 
+  /* ------------------------------------- Contenu d'un shulker (fenêtre) */
+  function initBoxes() {
+    var modal = null;
+    var last = null;
+
+    function build() {
+      modal = document.createElement('div');
+      modal.className = 'modal';
+      modal.hidden = true;
+      modal.innerHTML = '<div class="modal__backdrop" data-close></div>'
+        + '<div class="modal__card" role="dialog" aria-modal="true" aria-labelledby="modal-title">'
+        + '<div class="modal__head"><strong class="modal__title" id="modal-title"></strong>'
+        + '<button type="button" class="modal__close" data-close aria-label="Fermer">×</button></div>'
+        + '<div class="modal__body"></div></div>';
+      document.body.appendChild(modal);
+      modal.addEventListener('click', function (e) {
+        if (e.target.closest('[data-close]')) close();
+      });
+    }
+
+    function open(slot) {
+      var box = $('.slot__box', slot);
+      if (!box) return;
+      if (!modal) build();
+      last = slot;
+      $('.modal__title', modal).textContent = slot.getAttribute('data-box-name') || 'Contenu';
+      $('.modal__body', modal).innerHTML = box.innerHTML;
+      modal.hidden = false;
+      var tip = document.getElementById('tooltip');
+      if (tip) tip.hidden = true;
+      $('.modal__close', modal).focus();
+    }
+
+    function close() {
+      if (!modal || modal.hidden) return;
+      modal.hidden = true;
+      $('.modal__body', modal).innerHTML = '';
+      if (last) last.focus();
+      last = null;
+    }
+
+    document.addEventListener('click', function (e) {
+      var slot = e.target.closest ? e.target.closest('.slot--box') : null;
+      if (slot && (!modal || !modal.contains(slot))) open(slot);
+    });
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') { close(); return; }
+      if (e.key !== 'Enter' && e.key !== ' ') return;
+      var slot = e.target.closest ? e.target.closest('.slot--box') : null;
+      if (slot) { e.preventDefault(); open(slot); }
+    });
+  }
+
   /* --------------------------------------------------------------- Divers */
   function initCopy() {
     $$('[data-copy]').forEach(function (b) {
@@ -421,6 +474,7 @@
     initFilters();
     initForms();
     initMenus();
+    initBoxes();
     initCharts();
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);

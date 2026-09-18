@@ -148,13 +148,44 @@ function item_tip(array $it): string
 }
 
 /** Case d'inventaire. */
+/** Grille du contenu d'un conteneur (shulker, sac) : emplacements respectés quand ils existent. */
+function item_box(array $it): string
+{
+    $contents = $it['contents'] ?? [];
+    if (!$contents) {
+        return '';
+    }
+    $max = -1;
+    foreach ($contents as $sub) {
+        if (isset($sub['slot'])) {
+            $max = max($max, (int) $sub['slot']);
+        }
+    }
+    if ($max >= 0) {
+        return item_grid($contents, 0, max(27, (int) ceil(($max + 1) / 9) * 9));
+    }
+    // sac groupé (bundle) : pas d'emplacements, les objets se suivent
+    $html = '<div class="inv-grid">';
+    foreach ($contents as $sub) {
+        $html .= item_slot($sub);
+    }
+    return $html . '</div>';
+}
+
 function item_slot(?array $it, string $cls = '', string $placeholder = ''): string
 {
     if (!$it || ($it['id'] ?? 'air') === 'air') {
         return '<div class="slot slot--empty ' . h($cls) . '"' . ($placeholder !== '' ? ' title="' . h($placeholder) . '"' : '') . '></div>';
     }
     $ench = !empty($it['ench']) || !empty($it['stored']);
-    $html = '<div class="slot ' . h($cls) . ($ench ? ' slot--ench' : '') . '" tabindex="0" data-tip="' . h(item_tip($it)) . '">' . mc_icon($it['id']);
+    $box = !empty($it['contents']);
+    $name = ($it['name'] ?? '') !== '' ? $it['name'] : Mc::itemName($it['id']);
+    $html = '<div class="slot ' . h($cls) . ($ench ? ' slot--ench' : '') . ($box ? ' slot--box' : '') . '" tabindex="0"'
+        . ($box ? ' role="button" aria-haspopup="dialog" data-box-name="' . h($name) . '"' : '')
+        . ' data-tip="' . h(item_tip($it)) . '">' . mc_icon($it['id']);
+    if ($box) {
+        $html .= '<span class="slot__box" hidden>' . item_box($it) . '</span>';
+    }
     if ($it['count'] > 1) {
         $html .= '<span class="slot__count">' . (int) $it['count'] . '</span>';
     }
