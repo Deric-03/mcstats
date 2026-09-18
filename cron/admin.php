@@ -3,7 +3,8 @@
  * Gestion des admins du site en ligne de commande (réservé à qui a accès au serveur).
  *
  *   php cron/admin.php <pseudo>              active le compte et le rend admin
- *   php cron/admin.php <pseudo> --principal  le désigne admin principal (protégé des autres admins)
+ *   php cron/admin.php <pseudo> --principal  le désigne admin principal (protégé des autres admins),
+ *                                            sauf s'il est fixé dans config.php (accounts.owner)
  *   php cron/admin.php <pseudo> --retirer    retire les droits admin
  *   php cron/admin.php --liste               liste les comptes admin
  *
@@ -39,6 +40,16 @@ foreach ($args as $a) {
 $account = Auth::findByLogin($pseudo);
 if (!$account) {
     fwrite(STDERR, "Aucun compte « $pseudo ». Fais d'abord la demande de whitelist sur le site.\n");
+    exit(1);
+}
+$configOwner = Auth::configOwnerName();
+$isConfigOwner = $configOwner !== '' && ($found = Auth::findByLogin($configOwner)) && (int) $found['id'] === (int) $account['id'];
+if (in_array('--retirer', $args, true) && $isConfigOwner) {
+    fwrite(STDERR, "{$account['username']} est l'admin principal défini dans config.php (accounts.owner) : change ce réglage d'abord.\n");
+    exit(1);
+}
+if (in_array('--principal', $args, true) && $configOwner !== '') {
+    fwrite(STDERR, "L'admin principal est défini dans config.php (accounts.owner = « $configOwner ») : modifie ce réglage pour en changer.\n");
     exit(1);
 }
 if (in_array('--retirer', $args, true)) {

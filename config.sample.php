@@ -96,6 +96,10 @@ return [
         'enabled' => false,
         // Accepter les demandes des joueurs Bedrock (Geyser / Floodgate)
         'bedrock' => true,
+        // Admin principal : pseudo de son compte sur le site (préfixe Bedrock compris pour un joueur Bedrock).
+        // Les autres admins n'ont aucun droit sur lui ; il a le terminal et le donne à qui il veut.
+        // Son compte doit déjà être validé. Vide : le plus ancien admin (ou « cron/admin.php Pseudo --principal »).
+        'owner' => '',
         // Préfixe des pseudos Bedrock (réglage username-prefix de Floodgate)
         'bedrock_prefix' => '.',
         // Commandes envoyées au serveur par RCON quand une demande est validée

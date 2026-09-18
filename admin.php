@@ -242,6 +242,7 @@ require APP_ROOT . '/templates/header.php';
     </div>
   </div>
 
+  <?php if (($ownerProblem = Auth::configOwnerProblem()) !== ''): ?><div class="alert alert--warn" role="status"><?= h($ownerProblem) ?></div><?php endif; ?>
   <?php if ($flash): ?><div class="alert <?= !$flashOk ? 'alert--error' : ($flashWarn ? 'alert--warn' : 'alert--ok') ?>" role="status"><?= h($flash) ?></div><?php endif; ?>
 
   <section class="stack">

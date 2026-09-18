@@ -400,13 +400,25 @@ admins :
 Ce qu'il a fait sur les autres comptes reste visible dans leur journal à eux : sans cela, l'historique de
 ces comptes serait trompeur.
 
-Par défaut, c'est le premier admin (le plus ancien). Pour désigner quelqu'un d'autre, depuis le serveur —
-personne ne peut le faire depuis le site :
+**Le désigner dans `config.php`** (recommandé), section `accounts` — personne ne peut le changer depuis
+le site :
 
-```bash
-php /var/www/html/mcstats/cron/admin.php Pseudo --principal
+```php
+'accounts' => [
+    'enabled' => true,
+    'owner'   => 'VotrePseudo',   // préfixe Bedrock compris pour un joueur Bedrock
+],
 ```
 
+- Le compte doit **déjà être validé** : la config ne donne aucun droit à une demande en attente. Sinon,
+  quelqu'un qui ferait une demande de whitelist avec votre pseudo avant vous deviendrait admin principal.
+  Tant que le compte n'est pas actif, l'espace admin affiche un avertissement.
+- Ce compte devient admin automatiquement, et reste seul principal même si d'autres admins sont nommés.
+- Tant que `owner` est rempli, `cron/admin.php Pseudo --principal` et `--retirer` sur lui sont refusés :
+  c'est la config qui décide.
+
+Si `owner` est vide, l'admin principal est celui désigné avec
+`php /var/www/html/mcstats/cron/admin.php Pseudo --principal`, ou à défaut le plus ancien admin.
 `php cron/admin.php --liste` indique lequel des admins est le principal.
 
 ### Terminal du serveur

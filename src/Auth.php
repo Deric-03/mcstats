@@ -40,6 +40,12 @@ final class Auth
              WHERE s.token_hash = ? AND s.expires_at > ? AND a.status = 'active'",
             [hash('sha256', $token), time()]
         );
+        // l'admin principal défini dans config.php a toujours ses droits
+        $owner = $row ? self::owner() : null;
+        if ($row && $owner && (int) $owner['id'] === (int) $row['id']) {
+            $row['is_admin'] = 1;
+            $row['is_owner'] = 1;
+        }
         self::$user = $row ?: null;
         return self::$user;
     }
@@ -57,10 +63,59 @@ final class Auth
     public static function owner(): ?array
     {
         if (self::$owner === false) {
-            self::$owner = Db::one('SELECT * FROM accounts WHERE is_owner = 1 ORDER BY id ASC LIMIT 1')
-                ?: Db::one('SELECT * FROM accounts WHERE is_admin = 1 ORDER BY id ASC LIMIT 1');
+            self::$owner = self::configOwner()
+                ?? (Db::one('SELECT * FROM accounts WHERE is_owner = 1 ORDER BY id ASC LIMIT 1')
+                    ?: Db::one('SELECT * FROM accounts WHERE is_admin = 1 ORDER BY id ASC LIMIT 1'));
         }
         return self::$owner;
+    }
+
+    /** Pseudo de l'admin principal inscrit dans config.php (accounts.owner), ou ''. */
+    public static function configOwnerName(): string
+    {
+        return trim((string) App::cfg('accounts.owner', ''));
+    }
+
+    /**
+     * Admin principal désigné dans config.php. Il n'est appliqué qu'à un compte déjà validé :
+     * une demande de whitelist faite avec ce pseudo par quelqu'un d'autre ne donne aucun droit.
+     */
+    private static function configOwner(): ?array
+    {
+        $name = self::configOwnerName();
+        if ($name === '') {
+            return null;
+        }
+        $acc = self::findByLogin($name);
+        if (!$acc || $acc['status'] !== 'active') {
+            return null;
+        }
+        // la base suit la config : ce compte est admin et seul principal
+        $owners = array_map('intval', array_column(Db::all('SELECT id FROM accounts WHERE is_owner = 1'), 'id'));
+        if (empty($acc['is_admin']) || $owners !== [(int) $acc['id']]) {
+            Db::exec('UPDATE accounts SET is_owner = 0 WHERE is_owner = 1 AND id <> ?', [$acc['id']]);
+            Db::exec('UPDATE accounts SET is_admin = 1, is_owner = 1 WHERE id = ?', [$acc['id']]);
+            $acc['is_admin'] = 1;
+            $acc['is_owner'] = 1;
+        }
+        return $acc;
+    }
+
+    /** Problème avec l'admin principal de la config (pour l'espace admin), ou ''. */
+    public static function configOwnerProblem(): string
+    {
+        $name = self::configOwnerName();
+        if ($name === '') {
+            return '';
+        }
+        $acc = self::findByLogin($name);
+        if (!$acc) {
+            return "L'admin principal défini dans config.php (« $name ») n'a pas de compte sur le site : il doit d'abord faire sa demande de whitelist.";
+        }
+        if ($acc['status'] !== 'active') {
+            return "L'admin principal défini dans config.php (« $name ») n'a pas encore de compte validé : il ne devient principal qu'une fois son compte actif.";
+        }
+        return '';
     }
 
     /** Le compte connecté est-il l'admin principal ? */
